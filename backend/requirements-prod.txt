@@ -1,0 +1,58 @@
+# ===========================================================
+# Module: requirements-prod
+# Path:   backend/requirements-prod.txt
+#
+# Description:
+#     Dependencias Python para el contenedor de produccion.
+#     He excluido las herramientas de test y calidad de codigo
+#     (pytest, black, isort, flake8, mypy) porque no son necesarias
+#     en el contenedor desplegado en Cloud Run. Reducir las dependencias
+#     del contenedor disminuye la superficie de ataque y el tamano de
+#     la imagen.
+#
+# Sprint: Sprint 4
+# ===========================================================
+
+# --- Framework web ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.12
+
+# --- Base de datos ---
+sqlalchemy[asyncio]==2.0.36
+alembic==1.13.3
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+
+# --- Configuracion y secrets ---
+pydantic==2.9.2
+pydantic[email]==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+email-validator==2.2.0
+
+# --- Autenticacion JWT ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+# --- Clientes LLM ---
+anthropic==0.40.0
+openai==1.54.0
+
+# --- HTTP async ---
+httpx==0.27.2
+aiohttp==3.11.11
+
+# --- Rate limiting ---
+slowapi==0.1.9
+
+# --- Logging estructurado ---
+structlog==24.4.0
+
+# --- Procesado de imagen ---
+Pillow==11.2.1
+
+# --- Extraccion de texto desde ficheros ---
+pdfplumber==0.11.4
+python-docx==1.1.2

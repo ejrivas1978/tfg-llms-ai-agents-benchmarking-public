@@ -1,0 +1,111 @@
+# ===========================================================
+# nginx.conf.template
+# Ruta: frontend/nginx.conf.template
+#
+# Descripcion:
+#     Configuracion de Nginx para el contenedor del frontend.
+#     La imagen oficial de Nginx procesa automaticamente los
+#     ficheros *.template de /etc/nginx/templates/ con envsubst
+#     al arrancar el contenedor, sustituyendo las variables
+#     de entorno en la configuracion.
+#
+#     Variable requerida en Cloud Run:
+#         BACKEND_URL  ej: https://backend-abc123-uc.a.run.app
+#
+#     Funcionalidad clave:
+#     - Hace de proxy inverso para /api hacia el backend de
+#       Cloud Run. Asi el frontend React puede seguir usando
+#       rutas relativas (/api/v1/...) sin saber la URL del backend.
+#     - Sirve el SPA React con fallback a index.html para que
+#       React Router pueda manejar las rutas del lado del cliente.
+#     - Cabeceras de seguridad estandar para produccion.
+#
+# He elegido el resolver de Google (8.8.8.8) porque Cloud Run
+# necesita resolver el hostname del backend al proxiar. Usando
+# una variable ($backend) nginx resuelve el nombre en cada
+# peticion en lugar de al arrancar, lo que evita fallos si el
+# DNS no estuviera disponible durante el inicio del contenedor.
+#
+# Sprint: Sprint 4
+# ===========================================================
+
+server {
+    listen 8080;
+    server_name _;
+
+    # He deshabilitado la cabecera Server para no revelar la
+    # version de nginx en las respuestas HTTP.
+    server_tokens off;
+
+    # El backend acepta ficheros de hasta 10 MB. Sin este ajuste nginx
+    # rechaza con 413 cualquier body mayor de 1 MB (valor por defecto)
+    # antes de llegar a FastAPI, y el frontend recibe HTML en lugar de JSON.
+    client_max_body_size 11m;
+
+    # --- Cabeceras de seguridad ---
+    add_header X-Frame-Options           "DENY"            always;
+    add_header X-Content-Type-Options    "nosniff"         always;
+    add_header X-XSS-Protection          "1; mode=block"   always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+
+    # --- Proxy inverso hacia el backend FastAPI ---
+    # Necesito un resolver explicito para que nginx pueda resolver
+    # el hostname del backend en runtime (no en tiempo de startup).
+    # Sin 'set $backend', nginx intentaria resolver el hostname al
+    # arrancar y fallaria si el backend aun no esta disponible.
+    resolver 8.8.8.8 8.8.4.4 valid=60s ipv6=off;
+
+    location /api/ {
+        set $backend "${BACKEND_URL}";
+        proxy_pass $backend;
+
+        # Necesario para que nginx verifique el certificado TLS
+        # del backend de Cloud Run correctamente con SNI.
+        proxy_ssl_server_name on;
+
+        proxy_set_header Host              $proxy_host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        # Timeouts generosos porque las llamadas a LLMs pueden
+        # tardar hasta 2 minutos (imagen generativa).
+        proxy_connect_timeout 10s;
+        proxy_send_timeout    180s;
+        proxy_read_timeout    180s;
+    }
+
+    # --- SPA React: todas las rutas van a index.html ---
+    location / {
+        root  /usr/share/nginx/html;
+        index index.html;
+
+        # no-cache en index.html para que el navegador siempre revalide
+        # antes de usar la copia en cache. Sin esto, tras un deploy el
+        # navegador sigue sirviendo el index.html antiguo (con referencias
+        # a bundles viejos) hasta que el usuario hace un hard refresh.
+        # Los bundles JS/CSS si se pueden cachear (tienen hash en el nombre).
+        add_header Cache-Control "no-cache";
+
+        try_files $uri $uri/ /index.html;
+    }
+
+    # --- Assets estaticos con cache larga ---
+    # Vite genera nombres de fichero con hash (main.abc123.js),
+    # por lo que es seguro cachear agresivamente.
+    location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$ {
+        root    /usr/share/nginx/html;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # --- Health check de Cloud Run ---
+    # Cloud Run llama a este endpoint para verificar que el
+    # contenedor esta listo. Devuelvo 200 estatico sin log.
+    location /health {
+        access_log off;
+        return 200 "ok\n";
+        add_header Content-Type text/plain;
+    }
+}

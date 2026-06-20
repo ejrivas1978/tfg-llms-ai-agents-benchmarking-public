@@ -1,0 +1,33 @@
+# ===========================================================
+# .dockerignore — Frontend
+# Ruta: frontend/.dockerignore
+#
+# Excluye ficheros innecesarios del contexto de build de Docker.
+# ===========================================================
+
+# Dependencias — se instalan en el Dockerfile con npm ci
+node_modules/
+
+# Build anterior — el Dockerfile hace un build limpio
+dist/
+
+# Variables de entorno locales
+.env
+.env.*
+.env.local
+.env.development.local
+
+# Tests
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*

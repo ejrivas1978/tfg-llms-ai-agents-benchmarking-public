@@ -1,0 +1,228 @@
+@startuml sec_benchmark_persistencia
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' Inyectado por docs/diagramas/plantuml/_normalizar_estilo_claro.py
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+' Notas: amarillo palido, texto negro, borde naranja oscuro.
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+' Titulos
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+' Divisores y headers
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+' ─── Secuencia ───────────────────────────
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ─── Actividad ───────────────────────────
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+skinparam activityArrowColor #000000
+
+' ─── Estados ─────────────────────────────
+skinparam state {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+' ─── Casos de uso ────────────────────────
+skinparam usecase {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Clases ──────────────────────────────
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  StereotypeFontColor #595959
+}
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFF2CC
+skinparam classBorderColor #000000
+
+' ─── Componentes / paquetes ──────────────
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam node {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── ER ──────────────────────────────────
+skinparam entity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Rectangulos genericos ──────────────
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Interfaces ──────────────────────────
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Secuencia: Persistencia del benchmark + metricas (RF-10, RF-36, ADR-029)
+' Ruta: docs/diagramas/plantuml/sec_benchmark_persistencia.puml
+'
+' Continua desde sec_benchmark_ejecucion_paralela.
+' Tras recibir los ResultadoLLM (4 en caso normal, 8 en comparativa bilingue):
+'   1. Ronda ES: ejecutar_benchmark con idioma_prompt='es' (siempre).
+'   2. Ronda EN (opt): ejecutar_benchmark con prompt_en, idioma_prompt='en'
+'      solo si la categoria es bilingue Y el frontend paso prompt_en.
+'      Las dos rondas son SECUENCIALES, no paralelas.
+'   3. metricas.py enriquece cada ResultadoLLM.
+'   4. INSERT llm_responses x4 (normal) o x8 (bilingue).
+'   5. Jaccard se calcula SOLO sobre resultados idioma_prompt='es'.
+'   6. Descuenta 1 consulta (RF-36) si completada y actor es usuario web.
+' ============================================================
+
+participant "runner.py" as LR
+participant "metricas.py" as MET
+participant "BenchmarkService" as BS
+participant "BenchmarkEvaluacion\nRepository" as BR
+participant "LLMResponse\nRepository" as RR
+participant "UsuarioAppRepository" as UR
+database "PostgreSQL" as DB
+participant "benchmarkApi\n(axios)" as API
+participant "BenchmarkPage" as BP
+actor "Usuario web o admin" as U
+
+note over BS : Ronda ES (siempre):\nejecutar_benchmark(prompt, idioma='es')
+
+BS -> LR : ejecutar_benchmark(prompt_es,\nidioma_prompt='es')
+LR --> BS : list[ResultadoLLM] x4 (ES)
+
+opt comparativa_es_en == True\n(categoria bilingue Y prompt_en presente)
+  note over BS : Ronda EN (ADR-029):\nejecutar_benchmark(prompt_en, idioma='en')\nSecuencial, no paralela
+  BS -> LR : ejecutar_benchmark(prompt_en,\nidioma_prompt='en')
+  LR --> BS : list[ResultadoLLM] x4 (EN)
+  note over BS : resultados.extend(resultados_en)\ntotal: 8 ResultadoLLM
+end
+
+loop por cada ResultadoLLM (4 u 8 segun modo)
+  BS -> MET : calcular(response_text, tokens, latency_ms, categoria)
+  activate MET
+  MET -> MET : tokens_por_segundo\nratio_sal_ent\ncoste_usd\ncoste_por_100_palabras\npalabras / parrafos\ndiversidad_lexica
+  MET --> BS : metricas enriquecidas
+  deactivate MET
+  alt categoria == imagen_generativa
+    BS -> BS : descargar imagen +\nconvertir a JPEG\nbase64 (miniatura 512px)
+  end
+  BS -> RR : crear_desde_resultado(evaluacion_id, resultado)
+  RR -> DB : INSERT INTO llm_responses\n(idioma_prompt guardado en cada fila)
+end
+
+note over BS : Jaccard SOLO sobre\nresultados idioma_prompt='es'\n(las respuestas EN no son\ncomparables lexicamente con ES)
+BS -> BS : calcular_similitud_jaccard_media\n(textos con idioma_prompt='es')
+BS -> BR : actualizar_jaccard(evaluacion, jaccard)
+BR -> DB : UPDATE similitud_jaccard_media
+
+BS -> BS : hay_censura? hay_exito?\n_es_rechazo_politica()
+
+alt hay_censura == True OR hay_exito == False
+  BS -> BR : actualizar_estado(id, 'fallida')
+  BR -> DB : UPDATE benchmark_evaluaciones\nSET status='fallida'
+  note right of BS : RF-36: cuota NO\nse descuenta si\nfalla o hay censura
+else hay_exito && !hay_censura
+  BS -> BR : actualizar_estado(id, 'completada', jaccard)
+  BR -> DB : UPDATE status='completada',\n    completed_at=now()
+  alt actor es usuario web (no admin)
+    BS -> UR : incrementar_consultas_usadas()\n[RF-36 — 1 consulta aunque sean 8 respuestas]
+    UR -> DB : UPDATE usuarios_app\nSET consultas_usadas += 1\nWHERE nick = actor.nick
+  end
+end
+
+BS --> API : ResultadoBenchmark\n(4 u 8 respuestas + metricas)
+API --> BP : HTTP 200
+BP --> U : muestra BenchmarkCards (ES) + acordeon EN\n+ formulario valoracion\n(ver sec_valorar_propietario)
+
+@enduml

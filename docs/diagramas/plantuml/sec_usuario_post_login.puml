@@ -1,0 +1,198 @@
+@startuml sec_usuario_post_login
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' Inyectado por docs/diagramas/plantuml/_normalizar_estilo_claro.py
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+' Notas: amarillo palido, texto negro, borde naranja oscuro.
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+' Titulos
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+' Divisores y headers
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+' ─── Secuencia ───────────────────────────
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ─── Actividad ───────────────────────────
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+skinparam activityArrowColor #000000
+
+' ─── Estados ─────────────────────────────
+skinparam state {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+' ─── Casos de uso ────────────────────────
+skinparam usecase {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Clases ──────────────────────────────
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  StereotypeFontColor #595959
+}
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFF2CC
+skinparam classBorderColor #000000
+
+' ─── Componentes / paquetes ──────────────
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam node {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── ER ──────────────────────────────────
+skinparam entity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Rectangulos genericos ──────────────
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Interfaces ──────────────────────────
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Secuencia: Post-login del usuario web (RF-05 + eval pendiente)
+' Ruta: docs/diagramas/plantuml/sec_usuario_post_login.puml
+'
+' Tras un login exitoso (ver sec_usuario_login_exito), el
+' frontend hace dos chequeos antes de habilitar la pagina principal:
+'   1. Si guia_vista == False: muestra OnboardingGuide y marca
+'      guia_vista en BD (PATCH /usuarios/marcar-guia-vista).
+'   2. Comprueba si el usuario tiene una evaluacion completada
+'      pendiente de valoracion. Si la hay, muestra popup.
+' Despues redirige a BenchmarkPage o HistorialPage segun el caso.
+' ============================================================
+
+actor "Usuario web" as U
+participant "NickPage\n(React)" as NP
+participant "usuarioStore\n(Zustand)" as STORE
+participant "usuarioApi\n(axios)" as API
+participant "PATCH /usuarios/marcar-guia-vista\n(FastAPI)" as MARK
+participant "historialStore\n(Zustand)" as HS
+database "PostgreSQL" as DB
+
+note over NP,STORE : el JWT y los datos basicos del usuario\nya estan en usuarioStore tras el login
+
+alt guia_vista == false
+  NP --> U : muestra <OnboardingGuide />\n(logo escuela + 7 pasos)
+  U -> NP  : cierra la guia
+  NP -> API : marcarGuiaVista()
+  API -> MARK : PATCH /api/v1/usuarios/marcar-guia-vista\nAuthorization: Bearer JWT
+  MARK -> DB : UPDATE usuarios_app SET guia_vista = TRUE
+  DB --> MARK : ok
+  MARK --> API : 200 RespuestaUsuarioApp
+  API --> NP : ok
+  NP -> STORE : setGuiaVista(true)
+end
+
+NP -> HS : getState().sesiones[nick] ?? []
+HS --> NP : lista local de evaluaciones
+NP -> NP : busca status='completada'\n  AND evaluada=false
+
+alt hay evaluacion pendiente
+  NP --> U : popup "Tienes una evaluacion\npendiente de valorar"
+  note right of NP : comprobacion local en historialStore,\nsin round-trip al servidor
+else no hay pendiente
+  NP --> U : redirige a BenchmarkPage
+end
+
+@enduml

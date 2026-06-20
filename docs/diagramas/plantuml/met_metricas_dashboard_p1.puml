@@ -1,0 +1,98 @@
+@startuml met_metricas_dashboard_p1
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam object {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+}
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Diagrama: Metricas dashboard — Parte 1/3
+' Ruta: docs/diagramas/plantuml/met_metricas_dashboard_p1.puml
+' Cubre: campos devueltos por cada API LLM y su mapeo
+'         a los campos raw de ResultadoLLM.
+' ============================================================
+
+title Metricas automaticas 1/3 — Campos devueltos por cada API LLM
+
+object "Claude Sonnet 4.6  (Anthropic SDK)" as CLAUDE {
+  tokens_entrada   = usage.input_tokens
+  tokens_cacheados = usage.cache_read_input_tokens
+  tokens_salida    = usage.output_tokens
+  texto            = content[0].text
+  imagen           = no soporta txt2img  (ADR-011)
+}
+
+object "GPT-4o  +  gpt-image-1  (OpenAI SDK)" as GPT {
+  tokens_entrada   = usage.prompt_tokens
+  tokens_cacheados = usage.prompt_tokens_details.cached_tokens
+  tokens_salida    = usage.completion_tokens
+  texto            = choices[0].message.content
+  imagen           = b64_json  (quality=medium)
+}
+
+object "Gemini 2.5 Flash  (endpoint compat. OpenAI)" as GEM {
+  tokens_entrada   = usage.prompt_tokens
+  tokens_cacheados = prompt_tokens_details.cached_tokens
+  tokens_salida    = usage.completion_tokens
+  texto            = choices[0].message.content
+  imagen           = URL / bytes  (Imagen 4)
+}
+
+object "Grok 4.3  (xAI compat. OpenAI)" as GROK {
+  tokens_entrada   = usage.prompt_tokens
+  tokens_cacheados = prompt_tokens_details.cached_tokens
+  tokens_salida    = usage.completion_tokens
+  texto            = choices[0].message.content
+  imagen           = URL  (grok-imagine-image)
+}
+
+object "ResultadoLLM  —  campos raw" as RES {
+  tokens_entrada
+  tokens_entrada_cacheados
+  tokens_salida
+  texto_respuesta
+  url_imagen
+  tuvo_error
+}
+
+CLAUDE --> RES
+GPT    --> RES
+GEM    --> RES
+GROK   --> RES
+
+note right of CLAUDE
+  Claude no tiene tarifa
+  de imagen en BD (NULL).
+end note
+
+note bottom of RES
+  Parte 2/3: coste_usd y tarifa_id
+  Parte 3/3: metricas derivadas y dashboard
+end note
+
+@enduml

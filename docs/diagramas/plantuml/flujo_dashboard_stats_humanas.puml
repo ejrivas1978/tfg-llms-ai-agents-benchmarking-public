@@ -1,0 +1,105 @@
+@startuml flujo_dashboard_stats_humanas
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam database {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Sub-diagrama 2 de 4: StatsService - metricas humanas (ratings/ranking)
+' Ruta: docs/diagramas/plantuml/flujo_dashboard_stats_humanas.puml
+'
+' Cubre la caja "StatsService - metricas humanas" del flujo del
+' dashboard. Estos cinco metodos derivan de las VALORACIONES de
+' los usuarios (estrellas + ranking). Leen user_evaluations y, en
+' algunos casos, hacen join con llm_responses (para conocer el
+' proveedor) o con benchmark_evaluaciones (para filtrar imagen).
+'
+' Sub-diagramas hermanos:
+'   - flujo_dashboard_stats_automaticas
+'   - flujo_dashboard_charts_tecnicas
+'   - flujo_dashboard_charts_humanas_imagen
+' ============================================================
+
+title Flujo dashboard 2/4 — StatsService · metricas humanas (ratings/ranking)
+
+left to right direction
+
+database "PostgreSQL\n(Cloud SQL)" as DB {
+  [benchmark_evaluaciones] as T1
+  [llm_responses] as T2
+  [user_evaluations] as T3
+}
+
+rectangle "StatsService — metricas humanas (ratings/ranking)" as SS_HUM {
+  component "ratings_por_proveedor()\n[UserEvaluationRepository]" as M3
+  component "ranking_medio_por_proveedor()\n[UserEvaluationRepository]" as M4
+  component "ratings_por_proveedor_y_categoria()\n[UserEvaluationRepository]\njoin con llm_responses + benchmark" as M5
+  component "tasa_rechazo_por_proveedor()\n[UserEvaluationRepository]\nrating=0 / total imagen generativa" as M6
+  component "ratings_generacion_imagen_por_proveedor()\n[UserEvaluationRepository]" as M7
+}
+
+rectangle "GET /api/v1/stats\n→ RespuestaStats DTO" as API
+
+' ── BD -> metodos ─────────────────────────
+T3 --> M3
+T3 --> M4
+T3 --> M5
+T2 --> M5
+T1 --> M5
+T3 --> M6
+T1 --> M6
+T3 --> M7
+T2 --> M7
+
+' ── metodos -> API (campos del DTO) ───────
+M3 --> API : ratings_por_modelo[]
+M4 --> API : ranking_por_modelo[]
+M5 --> API : heatmap[]
+M6 --> API : tasa_rechazo[]
+M7 --> API : ratings_imagen_generativa[]
+
+note as NOTA_RECHAZO
+  **tasa_rechazo_por_proveedor()**
+  Denominador = COUNT(DISTINCT evaluacion_id)
+  con es_generacion_imagen=True.
+  Claude excluido (no genera imagenes).
+end note
+M6 .. NOTA_RECHAZO
+
+note bottom of API
+  Estos 5 campos del DTO alimentan
+  las graficas humanas + imagen
+  (ver flujo_dashboard_charts_humanas_imagen).
+end note
+
+@enduml

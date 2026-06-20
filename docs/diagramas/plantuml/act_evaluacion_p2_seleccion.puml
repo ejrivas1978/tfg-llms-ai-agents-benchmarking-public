@@ -1,0 +1,88 @@
+@startuml act_evaluacion_p2_seleccion
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+
+' Diagrama: Flujo de evaluacion humana — Parte 2/4: Seleccion de categoria
+' Proyecto: TFG LLM Benchmarking — Emilio Javier Rivas
+
+|Usuario Web|
+start
+note right
+  ════════════════════════
+   Viene de Parte 1/4
+   Autenticacion
+  ════════════════════════
+end note
+
+:Muestra listado fijo de modelos\nparticipantes sobre el PASO 1;
+
+partition "PASO 1 — Seleccionar categoria" {
+  :Grid de categorias visible\n(parpadea hasta que se hace click);
+  note right
+    Estado inicial: categoria = null
+    (sin categoria por defecto)
+  end note
+  :Usuario hace click en una categoria;
+
+  if (Evaluacion pendiente sin valorar?) then (si)
+    :Modal "Tienes una evaluacion pendiente"\nboton "Ir a evaluarla";
+    note right
+      Bloquea avance al PASO 2/3
+      hasta que se resuelva la
+      evaluacion pendiente.
+    end note
+    stop
+  elseif (Cuota agotada y sin pendiente?) then (si)
+    if (Ya solicito ampliacion?\n(consultasSolicitadas = true\n o estado = pendiente_ampliar_tokens)) then (si)
+      :Modal "Pendiente de ampliacion"\nboton "Entendido";
+      :Banner verde\n"Pendiente de ampliacion\nde cuota por el admin";
+      stop
+    else (no)
+      :Modal "Cuota agotada"\nboton "Solicitar Consultas";
+      :Solicita consultas\n(consultasSolicitadas = true);
+      stop
+    endif
+  endif
+
+  :Auto-scroll suave hacia PASO 2;
+}
+
+note right
+  ════════════════════════
+   Continua en Parte 3/4
+   Configuracion y ejecucion
+  ════════════════════════
+end note
+
+stop
+
+@enduml

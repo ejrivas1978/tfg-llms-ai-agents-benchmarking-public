@@ -1,0 +1,78 @@
+@startuml flujo_dashboard_charts_tecnicas
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Sub-diagrama 3 de 4: DashboardPage - graficas tecnicas + Jaccard
+' Ruta: docs/diagramas/plantuml/flujo_dashboard_charts_tecnicas.puml
+'
+' Cubre la caja "DashboardPage - metricas tecnicas + Jaccard" del
+' frontend. Siete graficas alimentadas por los campos del DTO
+' RespuestaStats que viene del endpoint GET /api/v1/stats. Estas
+' graficas son AUTOMATICAS (no requieren valoracion humana).
+'
+' Sub-diagramas hermanos:
+'   - flujo_dashboard_stats_automaticas
+'   - flujo_dashboard_stats_humanas
+'   - flujo_dashboard_charts_humanas_imagen
+' ============================================================
+
+title Flujo dashboard 3/4 — DashboardPage · graficas tecnicas + Jaccard
+
+left to right direction
+
+rectangle "GET /api/v1/stats\n→ RespuestaStats DTO\n(campos automaticos)" as API
+
+rectangle "DashboardPage.tsx — metricas tecnicas + Jaccard" as FE_AUT {
+  component "G1  Scatter — Latencia vs coste" as G1
+  component "G7  Bar — Latencia media por modelo (ms)" as G7
+  component "G8  Bar — Tokens entrada / salida" as G8
+  component "G9  Bar — Velocidad (tokens/segundo)" as G9
+  component "G10 Bar — Coste por 100 palabras" as G10
+  component "G11 Combo — Longitud y diversidad lexica" as G11
+  component "G12 Matrix — Similitud Jaccard" as G12
+}
+
+' ── API -> graficas (campo del DTO que consume cada una) ──
+API --> G1  : metricas_por_modelo[]
+API --> G7  : metricas_por_modelo[]
+API --> G8  : metricas_por_modelo[]
+API --> G9  : metricas_por_modelo[]
+API --> G10 : metricas_por_modelo[]
+API --> G11 : metricas_por_modelo[]
+API --> G12 : jaccard_pares[]
+
+note bottom of API
+  Estos campos provienen de los metodos
+  automaticos de StatsService
+  (ver flujo_dashboard_stats_automaticas).
+end note
+
+@enduml

@@ -1,0 +1,119 @@
+@startuml sec_valorar_admin_guard_p1
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+
+' ============================================================
+' Secuencia: Valoracion desde panel admin — Parte 1/2
+' Guards en frontend (RF-29)
+' El admin intenta valorar evaluacion ajena (Caso A)
+' y valora su propia evaluacion pendiente (Caso B).
+' Continua en sec_valorar_admin_guard_p2 (defensa backend).
+' ============================================================
+
+autonumber
+
+actor "Admin\n(root o promovido)" as Admin
+participant "TablaAdmin.tsx\n(o EvalViewModal)" as UI
+participant "useNickStore" as Store
+participant "useToastStore" as Toast
+
+note over Admin, Toast
+  ════════════════════════════════════════
+   Parte 1/2 — Guards en frontend (RF-29)
+  ════════════════════════════════════════
+end note
+
+== Caso A: el admin intenta valorar evaluacion AJENA ==
+
+Admin -> UI : visualiza fila con\ns.nickname = 'otro_user'
+UI -> Store : nick actual
+Store --> UI : 'admin'
+
+UI -> UI : compara s.nickname vs nickActual
+note right of UI
+  s.nickname = 'otro_user'
+  nickActual = 'admin'
+  -> no son propietarios
+end note
+
+UI --> Admin : muestra texto "sin valorar"\n(no boton clickable) + badge gris
+
+alt el admin pulsa el badge gris
+  UI -> Toast : mostrarToast("Solo @otro_user puede\nvalorar esta evaluacion", 'error')
+  Toast --> Admin : toast rojo
+  note right of UI
+    No se abre el modal de evaluacion.
+    El backend ni siquiera recibe la
+    peticion. Defensa en frontend.
+  end note
+end
+
+== Caso B: el admin valora SU propia evaluacion pendiente ==
+
+Admin -> UI : visualiza fila con\ns.nickname == nickActual
+UI --> Admin : muestra boton "Evaluar" (amarillo)
+
+Admin -> UI : pulsa "Evaluar"
+UI -> UI : abre EvalViewModal(sesionId)
+UI -> UI : prepara ranking:\nslots numerados vacios\n+ pool inferior con chips LLM
+
+note over Admin, Toast
+  El admin propietario sigue el mismo flujo que el usuario web:
+  slots vacios + pool de chips LLM, drag OBLIGATORIO a un slot,
+  Guardar deshabilitado hasta rankingCompleto && todosConRating.
+  No hay ConfirmModal de orden.
+end note
+
+note over Admin, Toast
+  ════════════════════════════════════════
+   Continua en sec_valorar_admin_guard_p2
+   (defensa adicional en backend)
+  ════════════════════════════════════════
+end note
+
+@enduml

@@ -1,0 +1,199 @@
+/* BatLoader — animaciones del murcielago cargador */
+
+.bat-loader-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 32px 0;
+}
+
+/* Esfera */
+.bat-sphere {
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: #323232;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 6px 32px rgba(0,0,0,0.6),
+    inset 0 -4px 14px rgba(255,255,255,0.04),
+    0 0 60px rgba(0,0,0,0.5);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Murcielago — flotacion por defecto */
+.bat-hover {
+  animation: bat-hover 2.4s ease-in-out infinite;
+  position: relative;
+  z-index: 2;
+}
+
+/* Alas */
+.wing-left {
+  animation: bat-flap-l 0.26s ease-in-out infinite alternate;
+  transform-origin: 93% 45%;
+}
+.wing-right {
+  animation: bat-flap-r 0.26s ease-in-out infinite alternate;
+  transform-origin: 7% 45%;
+}
+
+/* Ojos */
+.eyes-blink {
+  animation: bat-blink 3.5s ease-in-out infinite;
+}
+
+/* Giro al completar un modelo */
+.bat-hover.bat-spinning {
+  animation: bat-spin-once 0.7s ease-in-out forwards;
+}
+.bat-hover.bat-spinning .wing-left,
+.bat-hover.bat-spinning .wing-right {
+  animation: none;
+}
+
+/* Toast dentro de la esfera */
+.bat-toast {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 10;
+  pointer-events: none;
+}
+.bat-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0px);
+}
+
+/* Lista de modelos */
+.bat-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 280px;
+}
+.bat-model-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #aaaaaa;
+  transition: color 0.4s;
+}
+.bat-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.4s;
+}
+.bat-dot.done    { background: #5aaa1a; }
+.bat-dot.running { background: #f0a020; animation: bat-dot-pulse 1s ease-in-out infinite; }
+.bat-dot.waiting { background: #555555; }
+.bat-checkmark {
+  margin-left: auto;
+  color: #5aaa1a;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.bat-checkmark.visible { opacity: 1; }
+
+/* ── Keyframes ─────────────────────────────────────────────────────────── */
+@keyframes bat-hover {
+  0%,100% { transform: translateY(0px); }
+  50%     { transform: translateY(-10px); }
+}
+
+@keyframes bat-spin-once {
+  0%   { transform: translateY(0px)   rotate(0deg); }
+  40%  { transform: translateY(-12px) rotate(180deg); }
+  100% { transform: translateY(0px)   rotate(360deg); }
+}
+
+@keyframes bat-flap-l {
+  from { transform: rotate(0deg)   scaleY(1); }
+  to   { transform: rotate(-20deg) scaleY(0.65); }
+}
+
+@keyframes bat-flap-r {
+  from { transform: rotate(0deg)  scaleY(1); }
+  to   { transform: rotate(20deg) scaleY(0.65); }
+}
+
+@keyframes bat-blink {
+  0%,88%,100% { transform: scaleY(1); }
+  93%         { transform: scaleY(0.05); }
+}
+
+@keyframes bat-dot-pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%     { opacity:0.4; transform:scale(0.65); }
+}
+
+/* ── Gotas: sangre que se transforma en icono LLM ───────────────────────── */
+
+/* Fase 1 — gota de sangre: visible entre 12 % y 68 %, balanceo decreciente */
+.bat-drop-blood {
+  animation: bat-drop-blood-fall 2.6s ease-in infinite;
+}
+@keyframes bat-drop-blood-fall {
+  0%   { opacity: 0;   transform: translateY(-2px)  translateX(0px);  }
+  12%  { opacity: 1;   transform: translateY(0px)   translateX(0px);  }
+  25%  { opacity: 1;   transform: translateY(8px)   translateX(-5px); }
+  38%  { opacity: 1;   transform: translateY(19px)  translateX(4px);  }
+  50%  { opacity: 1;   transform: translateY(30px)  translateX(-3px); }
+  60%  { opacity: 1;   transform: translateY(40px)  translateX(2px);  }
+  68%  { opacity: 0;   transform: translateY(48px)  translateX(-1px); }
+  100% { opacity: 0;   transform: translateY(71px)  translateX(0px);  }
+}
+
+/* Fase 2 — icono LLM: aparece en el cruce (68 %) con la misma posicion */
+.bat-drop-icon {
+  animation: bat-drop-icon-fall 2.6s ease-in infinite;
+}
+@keyframes bat-drop-icon-fall {
+  0%   { opacity: 0;   transform: translateY(-2px)  translateX(0px);  }
+  25%  { opacity: 0;   transform: translateY(8px)   translateX(-5px); }
+  38%  { opacity: 0;   transform: translateY(19px)  translateX(4px);  }
+  50%  { opacity: 0;   transform: translateY(30px)  translateX(-3px); }
+  60%  { opacity: 0;   transform: translateY(40px)  translateX(2px);  }
+  68%  { opacity: 1;   transform: translateY(48px)  translateX(-1px); }
+  83%  { opacity: 0.4; transform: translateY(62px)  translateX(1px);  }
+  100% { opacity: 0;   transform: translateY(71px)  translateX(0px);  }
+}
+
+/* ── Salpicaduras de sangre/LLM en la esfera al girar ───────────────────── */
+.bat-splatter {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+/* Ocultas por defecto; aparecen al activarse bat-splattering en el padre */
+.bat-splatter-mark { opacity: 0; }
+.bat-splattering .bat-splatter-mark {
+  animation: bat-splat 2.8s ease-out forwards;
+  /* El animation-delay se aplica por estilo inline en JSX para poder ser dinamico */
+}
+@keyframes bat-splat {
+  0%   { opacity: 0;   }
+  6%   { opacity: 0.9; }
+  35%  { opacity: 0.6; }
+  100% { opacity: 0;   }
+}

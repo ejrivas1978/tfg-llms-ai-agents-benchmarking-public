@@ -1,0 +1,206 @@
+@startuml sec_usuario_registro
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' Inyectado por docs/diagramas/plantuml/_normalizar_estilo_claro.py
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+' Notas: amarillo palido, texto negro, borde naranja oscuro.
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+' Titulos
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+' Divisores y headers
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+' ─── Secuencia ───────────────────────────
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ─── Actividad ───────────────────────────
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+skinparam activityArrowColor #000000
+
+' ─── Estados ─────────────────────────────
+skinparam state {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+' ─── Casos de uso ────────────────────────
+skinparam usecase {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Clases ──────────────────────────────
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  StereotypeFontColor #595959
+}
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFF2CC
+skinparam classBorderColor #000000
+
+' ─── Componentes / paquetes ──────────────
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam node {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── ER ──────────────────────────────────
+skinparam entity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Rectangulos genericos ──────────────
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Interfaces ──────────────────────────
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Secuencia: Alta de cuenta nueva (RF-02)
+' Ruta: docs/diagramas/plantuml/sec_usuario_registro.puml
+'
+' Endpoint POST /api/v1/usuarios/registrar (rate-limit 5/min).
+' La cuenta queda en estado pendiente_acceso hasta que un admin la
+' habilita (ver sec_admin_post_login para el flujo de aprobacion).
+'
+' UsuarioAppAuthService.registrar() hashea con bcrypt antes de
+' insertar (Security.hash_password()).
+' ============================================================
+
+actor "Usuario web" as U
+participant "NickPage\n(React)" as NP
+participant "usuarioApi\n(axios)" as API
+participant "POST /usuarios/registrar\n(FastAPI)" as REG
+participant "UsuarioAppAuthService" as SVC
+participant "Security" as SEC
+participant "UsuarioAppRepository" as REPO
+database "PostgreSQL\nusuarios_app" as DB
+
+note over U,NP : el paso previo (verificar nick) determino que el nick NO existia\nver sec_usuario_verificar_nick
+
+U   -> NP  : introduce contrasena + confirmacion
+activate NP
+NP  -> API : registrarUsuario({ nick, password })
+activate API
+API -> REG : POST /api/v1/usuarios/registrar\nBody: { nick, password }
+note right of REG : rate-limit: 5/min por IP
+activate REG
+REG -> SVC : registrar(nick, password)
+activate SVC
+note right of SVC
+  PeticionRegistro (Pydantic) aplica
+  field_validator: nick.strip().lower()
+  case-insensitive.
+end note
+SVC -> SEC : hash_password(password)
+SEC --> SVC : bcrypt_hash
+SVC -> REPO : crear(nick, hash)
+activate REPO
+REPO -> DB : INSERT INTO usuarios_app\n(nick, password_hash,\n estado='pendiente_acceso',\n cuota_asignada=0,\n consultas_usadas=0)
+DB --> REPO : usuario.id
+REPO --> SVC : UsuarioApp
+deactivate REPO
+SVC --> REG : RespuestaUsuarioApp
+deactivate SVC
+REG --> API : HTTP 201 Created
+deactivate REG
+API --> NP : { id, nick, estado: pendiente_acceso, ... }
+deactivate API
+NP --> U   : "Tu solicitud ha sido enviada.\nEspera aprobacion del administrador."
+deactivate NP
+
+@enduml

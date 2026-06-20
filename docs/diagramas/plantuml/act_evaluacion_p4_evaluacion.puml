@@ -1,0 +1,89 @@
+@startuml act_evaluacion_p4_evaluacion
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+
+' Diagrama: Flujo de evaluacion humana — Parte 4/4: Evaluacion y ranking
+' Proyecto: TFG LLM Benchmarking — Emilio Javier Rivas
+
+|Usuario Web|
+start
+note right
+  ════════════════════════
+   Viene de Parte 3/4
+   Configuracion y ejecucion
+  ════════════════════════
+end note
+
+:Ve 4 BenchmarkCard con respuestas ES\n+ AutoStats con metricas agregadas\n+ acordeon "Ver respuesta en ingles"\nsi es evaluacion bilingue (ADR-029);
+
+:Puntua con 1-5 estrellas cada respuesta ES\n(las respuestas EN no se valoran, ADR-029);
+
+partition "PASO 4 — Ranking: slots vacios + pool de LLMs" {
+  :4 slots numerados (1.º .. N) vacios\n+ chips de LLM en pool inferior;
+  note right
+    El humano DEBE arrastrar
+    cada chip desde el pool
+    a un slot numerado.
+    Reglas DnD:
+     - pool -> slot vacio: asigna
+     - pool -> slot ocupado:
+       el ocupante vuelve al pool
+     - slot -> slot: swap
+     - slot -> pool: libera
+  end note
+  :Humano arrastra cada LLM\ndesde el pool a un slot numerado\n(4 arrastres texto / 3 imagen);
+  :rankingCompleto = todos los\nslots estan ocupados;
+}
+
+if (rankingCompleto\n&& todosConRating?) then (si)
+  :Boton "Guardar evaluacion"\nse habilita y parpadea\n(animate-pulse-strong);
+  note right
+    Indicadores visibles:
+     * = puntuacion incompleta
+     ✓ = puntuacion completada
+    No existe ConfirmModal de
+    orden: el drag es obligatorio
+    por diseno (ADR-028).
+  end note
+  :Pulsa "Guardar evaluacion";
+  |Backend|
+  :POST /evaluaciones\nINSERT x4 user_evaluations\n(posicion en slots = rango_preferencia);
+  |Usuario Web|
+  :evaluada = true en historialStore;
+  :Opciones: "+ Nueva Comparativa"\no "Ver historial →";
+else (no)
+  :Aviso validacion pendiente\n(boton Guardar deshabilitado);
+endif
+
+stop
+
+@enduml

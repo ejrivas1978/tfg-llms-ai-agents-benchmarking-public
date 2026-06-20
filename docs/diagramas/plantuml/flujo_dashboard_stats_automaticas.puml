@@ -1,0 +1,97 @@
+@startuml flujo_dashboard_stats_automaticas
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam database {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Sub-diagrama 1 de 4: StatsService - metricas automaticas y agregados
+' Ruta: docs/diagramas/plantuml/flujo_dashboard_stats_automaticas.puml
+'
+' Cubre la caja "StatsService - metricas automaticas y agregados"
+' del flujo del dashboard. Estos cuatro metodos NO dependen de
+' valoraciones humanas: leen llm_responses y benchmark_evaluaciones
+' y devuelven al endpoint stats las metricas tecnicas y agregados.
+'
+' Sub-diagramas hermanos:
+'   - flujo_dashboard_stats_humanas
+'   - flujo_dashboard_charts_tecnicas
+'   - flujo_dashboard_charts_humanas_imagen
+' ============================================================
+
+title Flujo dashboard 1/4 — StatsService · metricas automaticas y agregados
+
+left to right direction
+
+database "PostgreSQL\n(Cloud SQL)" as DB {
+  [benchmark_evaluaciones] as T1
+  [llm_responses] as T2
+}
+
+rectangle "StatsService — metricas automaticas y agregados" as SS_AUT {
+  component "medias_por_proveedor()\n[LLMResponseRepository]" as M1
+  component "medias_imagen_por_proveedor()\n[LLMResponseRepository]\nfiltra es_generacion_imagen=True" as M2
+  component "evaluaciones_por_categoria()\n[BenchmarkEvaluacionRepository]" as M8
+  component "textos_por_evaluacion_y_proveedor()\n+ jaccard_bigramas() en Python\n[LLMResponseRepository]" as M10
+}
+
+rectangle "GET /api/v1/stats\n→ RespuestaStats DTO" as API
+
+' ── BD -> metodos ─────────────────────────
+T2 --> M1
+T1 --> M2
+T2 --> M2
+T1 --> M8
+T2 --> M10
+
+' ── metodos -> API (campos del DTO) ───────
+M1  --> API : metricas_por_modelo[]
+M2  --> API : metricas_imagen_por_modelo[]
+M8  --> API : evaluaciones_por_categoria[]
+M10 --> API : jaccard_pares[]
+
+note as NOTA_JACCARD
+  **textos_por_evaluacion_y_proveedor()**
+  El calculo Jaccard se hace en Python
+  sobre los textos en memoria (no en SQL).
+  Complejidad O(N² × L), N=4 proveedores.
+end note
+M10 .. NOTA_JACCARD
+
+note bottom of API
+  Estos 4 campos del DTO alimentan
+  las graficas tecnicas + Jaccard
+  (ver flujo_dashboard_charts_tecnicas).
+end note
+
+@enduml

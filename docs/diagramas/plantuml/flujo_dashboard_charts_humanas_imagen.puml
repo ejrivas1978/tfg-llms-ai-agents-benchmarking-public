@@ -1,0 +1,84 @@
+@startuml flujo_dashboard_charts_humanas_imagen
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Sub-diagrama 4 de 4: DashboardPage - graficas humanas y de imagen
+' Ruta: docs/diagramas/plantuml/flujo_dashboard_charts_humanas_imagen.puml
+'
+' Cubre la caja "DashboardPage - metricas humanas y de imagen" del
+' frontend. Ocho graficas alimentadas por los campos del DTO
+' RespuestaStats. Las humanas derivan de las valoraciones de los
+' usuarios; las de imagen son especificas del subconjunto de
+' evaluaciones con es_generacion_imagen=True (3 proveedores).
+'
+' Sub-diagramas hermanos:
+'   - flujo_dashboard_stats_automaticas
+'   - flujo_dashboard_stats_humanas
+'   - flujo_dashboard_charts_tecnicas
+' ============================================================
+
+title Flujo dashboard 4/4 — DashboardPage · graficas humanas y de imagen
+
+left to right direction
+
+rectangle "GET /api/v1/stats\n→ RespuestaStats DTO\n(campos humanos + imagen)" as API
+
+rectangle "DashboardPage.tsx — metricas humanas y de imagen" as FE_HUM {
+  component "G2  Bar — Valoracion media (texto, 1–5)" as G2
+  component "G3  Bar — Ranking de preferencia medio" as G3
+  component "G4  Heatmap — Valoracion modelo × categoria" as G4
+  component "G5  Radar — Perfil tecnico normalizado" as G5
+  component "G6  Donut — Distribucion por categoria" as G6
+  component "G13 Bar — Latencia imagen generativa" as G13
+  component "G14 Bar — Valoracion media — imagen (1–5)" as G14
+  component "G15 Bar — Tasa de rechazo — imagen" as G15
+}
+
+' ── API -> graficas (campo del DTO que consume cada una) ──
+API --> G2  : ratings_por_modelo[]
+API --> G3  : ranking_por_modelo[]
+API --> G4  : heatmap[]
+API --> G5  : metricas_por_modelo[]\n+ ratings_por_modelo[]\n+ ranking_por_modelo[]
+API --> G6  : evaluaciones_por_categoria[]
+API --> G13 : metricas_imagen_por_modelo[]
+API --> G14 : ratings_imagen_generativa[]
+API --> G15 : tasa_rechazo[]
+
+note bottom of API
+  Estos campos provienen de los metodos
+  humanos de StatsService (M3..M7) y de
+  algunos automaticos como M2 (imagen) y
+  M8 (categoria).
+  Ver flujo_dashboard_stats_humanas
+  y flujo_dashboard_stats_automaticas.
+end note
+
+@enduml

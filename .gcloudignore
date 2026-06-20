@@ -1,0 +1,65 @@
+# ===========================================================
+# .gcloudignore
+# Ruta: COMPARADOR_LLM/.gcloudignore
+#
+# Excluye ficheros innecesarios del contexto que 'gcloud builds submit'
+# sube a Cloud Build. A diferencia de .dockerignore (que aplica por
+# Dockerfile), este fichero aplica al contexto completo del proyecto.
+#
+# He incluido '#!include:.gitignore' para que tambien se respeten
+# las exclusiones del .gitignore sin duplicar la lista.
+#
+# Sprint: Sprint 4
+# ===========================================================
+
+# He habilitado la herencia del .gitignore para no mantener dos listas
+# de exclusiones sincronizadas.
+#!include:.gitignore
+
+# Entornos virtuales Python — solo pesan cientos de MB y son inutil
+# en el contexto de Cloud Build (pip install se hace en el Dockerfile)
+backend/.venv-tfg-llm/
+backend/.venv/
+backend/venv/
+backend/env/
+
+# Modulos de Node — npm ci se ejecuta en el Dockerfile del frontend
+frontend/node_modules/
+
+# Build del frontend — el Dockerfile hace un build limpio con Vite
+frontend/dist/
+
+# Secretos locales — nunca deben salir de la maquina del desarrollador
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
+# Cache de Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Cobertura de tests — no necesaria para el build
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/coverage.xml
+
+# Herramientas de calidad de codigo
+backend/.mypy_cache/
+backend/.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+**/*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Git
+.git/
+.gitignore

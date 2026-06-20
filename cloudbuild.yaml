@@ -1,0 +1,217 @@
+# ===========================================================
+# cloudbuild.yaml
+# Ruta: COMPARADOR_LLM/cloudbuild.yaml
+#
+# Descripcion:
+#     Pipeline de Cloud Build para construir, subir y desplegar
+#     ambos servicios (backend FastAPI y frontend Nginx/React)
+#     en Google Cloud Run.
+#
+#     Fases:
+#       1. Build de las dos imagenes Docker en paralelo.
+#       2. Push a Artifact Registry (con :SHORT_SHA y :latest).
+#       3. Deploy del backend a Cloud Run (con Cloud SQL + secretos).
+#       4. Deploy del frontend a Cloud Run (tras confirmar backend).
+#
+#     Variables de sustitucion que se configuran en el trigger
+#     de Cloud Build (GCP Console > Cloud Build > Triggers > Variables):
+#
+#       _REGION          Region de GCP. Ej: europe-west1
+#       _REPO            Nombre del repositorio en Artifact Registry. Ej: tfg-llms
+#       _BACKEND_SERVICE Nombre del servicio Cloud Run para el backend. Ej: tfg-backend
+#       _FRONTEND_SERVICE Nombre del servicio Cloud Run para el frontend. Ej: tfg-frontend
+#       _DB_INSTANCE     Nombre corto de la instancia Cloud SQL. Ej: tfg-pg
+#       _BACKEND_URL     URL completa del backend (se obtiene tras el primer deploy).
+#                        Ej: https://tfg-backend-abc123-ew.a.run.app
+#       _ALLOWED_ORIGINS JSON de origenes CORS permitidos. Ej: ["https://tfg-frontend.run.app"]
+#                        (cadena vacia [] en el primer deploy; actualizar tras conocer la URL
+#                         del frontend)
+#
+#     NOTA SOBRE EL PRIMER DESPLIEGUE:
+#       La primera vez existe un problema de dependencia circular:
+#       el backend necesita la URL del frontend para CORS, y el frontend
+#       necesita la URL del backend para el proxy. El procedimiento de
+#       bootstrap se describe en docs/guides/04_despliegue_cloud_run.md.
+#
+#     SECRETOS REQUERIDOS EN SECRET MANAGER (crear una vez):
+#       DATABASE_URL, SECRET_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY,
+#       GOOGLE_API_KEY, XAI_API_KEY
+#       Ver: docs/guides/03_seguridad_autenticacion.md, seccion 6.4
+#
+# Sprint: Sprint 4
+# ===========================================================
+
+# He definido valores por defecto para las sustituciones para que el
+# pipeline se pueda lanzar con 'gcloud builds submit' sin tener que
+# especificar todas las variables en la primera prueba.
+substitutions:
+  _REGION: europe-west1
+  _REPO: tfg-llms
+  _BACKEND_SERVICE: tfg-backend
+  _FRONTEND_SERVICE: tfg-frontend
+  _DB_INSTANCE: tfg-pg
+  _BACKEND_URL: ''
+  # ALLOWED_ORIGINS se gestiona en Secret Manager (no como sustitucion) para evitar
+  # que gcloud interprete los corchetes del JSON como lista vacia al parsear --set-env-vars.
+  # Para actualizar el valor: gcloud secrets versions add ALLOWED_ORIGINS --data-file=-
+  # He usado _IMAGE_TAG en lugar de ${_IMAGE_TAG} porque SHORT_SHA solo se
+  # rellena automaticamente en builds disparados por trigger de GitHub.
+  # Con 'gcloud builds submit' manual quedaria vacio y el nombre de imagen
+  # seria invalido. Al usar una variable propia con valor por defecto 'latest'
+  # el pipeline funciona en ambos modos. En el trigger de GitHub se configura
+  # _IMAGE_TAG=${_IMAGE_TAG} para mantener trazabilidad por commit.
+  _IMAGE_TAG: latest
+
+steps:
+  # ===========================================================
+  # FASE 1: Build de imagenes Docker
+  # He optado por construir ambas imagenes en paralelo (no tienen
+  # dependencia entre si) para reducir el tiempo total del pipeline.
+  # Cloud Build ejecuta en paralelo todos los steps que no tienen
+  # 'waitFor' o cuyo 'waitFor' ya ha sido satisfecho.
+  # ===========================================================
+
+  # Build del backend FastAPI (python:3.11-slim multi-stage)
+  - name: gcr.io/cloud-builders/docker
+    id: build-backend
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:${_IMAGE_TAG}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest
+      - --file
+      - backend/Dockerfile
+      - backend
+
+  # Build del frontend React + Nginx (node:20-alpine + nginx:1.27-alpine multi-stage)
+  - name: gcr.io/cloud-builders/docker
+    id: build-frontend
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:${_IMAGE_TAG}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest
+      - --file
+      - frontend/Dockerfile
+      - frontend
+
+  # ===========================================================
+  # FASE 2: Push a Artifact Registry
+  # He usado --all-tags para subir tanto :SHORT_SHA como :latest
+  # en un unico paso. SHORT_SHA permite trazabilidad (saber exactamente
+  # que commit esta desplegado); :latest permite hacer rollback rapido
+  # con 'gcloud run deploy --image=.../backend:latest'.
+  # ===========================================================
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-backend
+    waitFor: [build-backend]
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-frontend
+    waitFor: [build-frontend]
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend
+
+  # ===========================================================
+  # FASE 3: Deploy del backend a Cloud Run
+  #
+  # He configurado:
+  #   --add-cloudsql-instances: monta el socket Unix del proxy Cloud SQL
+  #     en /cloudsql/PROJECT:REGION:INSTANCE, que es la ruta que usa
+  #     DATABASE_URL con asyncpg.
+  #   --update-secrets: inyecta las variables sensibles desde Secret Manager
+  #     (version :latest de cada secreto). La base de datos y las API keys
+  #     nunca aparecen en texto plano en los logs de Cloud Build.
+  #   --set-env-vars: solo para variables no sensibles (entorno y CORS).
+  #   --min-instances=0: escala a cero cuando no hay trafico (coste cero idle).
+  #   --max-instances=3: limite para el TFG; 3 instancias son mas que suficientes.
+  #   --workers=1 ya esta forzado en docker-entrypoint.sh; asyncpg no soporta
+  #     multiples workers dentro del mismo proceso sin un pool externo.
+  # ===========================================================
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: deploy-backend
+    waitFor: [push-backend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_BACKEND_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:${_IMAGE_TAG}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=3
+      - --add-cloudsql-instances=$PROJECT_ID:${_REGION}:${_DB_INSTANCE}
+      - >-
+        --update-secrets=SECRET_KEY=SECRET_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,GOOGLE_API_KEY=GOOGLE_API_KEY:latest,XAI_API_KEY=XAI_API_KEY:latest,DATABASE_URL=DATABASE_URL:latest,ALLOWED_ORIGINS=ALLOWED_ORIGINS:latest
+      - --set-env-vars=ENVIRONMENT=production
+
+  # ===========================================================
+  # FASE 4: Deploy del frontend a Cloud Run
+  #
+  # El frontend espera a que el backend este desplegado (waitFor) para
+  # garantizar que el proxy /api/ tiene un backend operativo desde el
+  # primer momento.
+  #
+  # BACKEND_URL es la unica variable de entorno que necesita el frontend:
+  # Nginx la lee en runtime (via envsubst) para construir la URL de proxy.
+  # Si _BACKEND_URL esta vacio (primer deploy), el proxy de Nginx fallara
+  # en runtime. El procedimiento de bootstrap en el manual de despliegue
+  # explica como gestionar esta situacion.
+  #
+  # He elegido 256Mi para el frontend porque Nginx sirve estaticos y
+  # hace de proxy HTTP ligero; no necesita el mismo recurso que FastAPI.
+  # ===========================================================
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: deploy-frontend
+    waitFor: [push-frontend, deploy-backend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_FRONTEND_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:${_IMAGE_TAG}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --memory=256Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=3
+      - --set-env-vars=BACKEND_URL=${_BACKEND_URL}
+
+# He declarado las imagenes aqui para que Cloud Build las registre
+# en el historial de builds y se puedan ver en Artifact Registry Console
+# junto con el SHORT_SHA del commit que las genero.
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:${_IMAGE_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:${_IMAGE_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest
+
+options:
+  # He elegido E2_HIGHCPU_8 (8 vCPU) en lugar de la maquina por defecto
+  # (E2_MEDIUM, 1 vCPU) porque los builds de Docker con compilacion de
+  # extensiones Python (Pillow, pdfplumber) y la transpilacion TypeScript
+  # de Vite se benefician mucho de mas nucleos. El coste adicional es
+  # de ~0.02 USD por build, despreciable para un TFG.
+  machineType: E2_HIGHCPU_8
+  # CLOUD_LOGGING_ONLY evita duplicar logs en el bucket de GCS,
+  # reduciendo costes de almacenamiento.
+  logging: CLOUD_LOGGING_ONLY

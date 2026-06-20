@@ -1,0 +1,112 @@
+@startuml meto_evolucion_modelos
+
+' ============================================================
+' Timeline moderno: tarjetas verticales por proveedor
+' Diagrama: meto_evolucion_modelos
+' ============================================================
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 10
+skinparam defaultFontColor #2C3E50
+skinparam shadowing false
+
+skinparam sequence {
+  ArrowColor #FFFFFF
+  LifeLineBorderColor #D0D3D4
+  LifeLineBackgroundColor #FAFAFA
+  ParticipantBackgroundColor #FAFAFA
+  ParticipantBorderColor #FAFAFA
+  ParticipantFontColor #FAFAFA
+  BoxBackgroundColor #FAFAFA
+  BoxBorderColor #FAFAFA
+  DividerBackgroundColor #ECF0F1
+  DividerFontColor #566573
+  DividerBorderColor #BFC9CA
+}
+
+skinparam note {
+  RoundCorner 10
+  BorderThickness 1
+  FontSize 10
+  FontName Arial
+}
+
+skinparam title {
+  FontColor #1B2631
+  FontSize 14
+  FontStyle bold
+  FontName Arial
+}
+
+title Evolución de los modelos LLM en el benchmark\noct 2025 – may 2026
+
+hide footbox
+
+participant "  " as T
+
+== 2025 ==
+
+note over T #EBF5FB
+<b><color:#1A5276>①  OCT 2025  —  Stack inicial  (todos los proveedores)</color></b>
+<color:#626567>Sprint 1: cuatro clientes LLM configurados y operativos</color>
+claude-3-5-sonnet-20241022  ·  gpt-4o + dall-e-3
+gemini-1.5-pro  ·  grok-2 + grok-imagine-image
+end note
+
+|||
+
+note over T #EAFAF1
+<b><color:#1E8449>②  NOV 2025  —  Claude 3.5 Haiku  ·  Anthropic</color></b>
+<color:#626567>Modelo más rápido y económico de Anthropic, evaluado y descartado</color>
+Mantenemos claude-3-5-sonnet para homogeneidad de calidad
+end note
+
+|||
+
+note over T #FEF9E7
+<b><color:#9A7D0A>③  DIC 2025  —  GPT-4 Turbo sunset  ·  OpenAI</color></b>
+<color:#626567>OpenAI cierra el acceso a gpt-4-turbo-preview y variantes</color>
+Sin impacto: el benchmark ya operaba sobre gpt-4o
+end note
+
+== 2026 ==
+
+note over T #EAFAF1
+<b><color:#1E8449>④  FEB 2026  —  Gemini 2.5 Flash GA + Imagen 4  ·  Google</color></b>
+<color:#626567>gemini_client.py: "gemini-1.5-pro" → "gemini-2.5-flash"</color>
+Nueva API imagen-4.0-generate-001  ·  SOPORTA_IMAGEN = True
+end note
+
+|||
+
+note over T #EAFAF1
+<b><color:#1E8449>⑤  MAR 2026  —  gemini-2.5-flash-image  ·  Google</color></b>
+<color:#626567>Edición imagen-a-imagen nativa (alias Nano Banana)</color>
+SOPORTA_EDICION_IMAGEN = True  ·  endpoint REST nativo de Google AI
+end note
+
+|||
+
+note over T #F5EEF8
+<b><color:#6C3483>⑥  ABR 2026  —  Grok 4.3  ·  xAI</color></b>
+<color:#626567>Texto y visión unificados en un único modelo</color>
+grok_client.py: "grok-2" → "grok-4.3"  ·  eliminado _MODELO_VISION separado
+end note
+
+|||
+
+note over T #EBF5FB
+<b><color:#154360>⑦  MAY 2026 s1  —  Claude Sonnet 4.6  ·  Anthropic</color></b>
+<color:#626567>Nuevo modelo estable de la familia Claude 4</color>
+claude_client.py: _MODELO_DEFAULT → "claude-sonnet-4-6"
+end note
+
+|||
+
+note over T #FDEDEC
+<b><color:#922B21>⑧  13 MAY 2026  —  DALL-E 3 retirado  ·  OpenAI  ·  URGENTE</color></b>
+<color:#626567>HTTP 400 "model does not exist" — migración correctiva</color>
+dall-e-3 → gpt-image-1  ·  respuesta URL → base64  ·  entrada JPEG → PNG
+end note
+
+@enduml

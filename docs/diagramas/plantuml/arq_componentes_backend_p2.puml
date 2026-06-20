@@ -1,0 +1,105 @@
+@startuml arq_componentes_backend_p2
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam ArrowThickness 1.4
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #FFF9CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Arquitectura Backend — Parte 2/3: Motor LLM
+' Ruta: docs/diagramas/plantuml/arq_componentes_backend_p2.puml
+' Cubre: LLMRunner (asyncio.gather), jerarquia BaseLLMClient,
+'        los 4 clientes y sus APIs externas.
+' ============================================================
+
+title Backend 2/3 — Motor LLM: runner, clientes y APIs externas
+
+component "BenchmarkService\n(desde Parte 1/3)" as BS
+
+package "llm_engine/" as PKG_ENGINE {
+
+  component "runner.py\nejecutar_benchmark()\nasyncio.gather — 4 llamadas paralelas" as RUN
+
+  component "metricas.py\ncalcular_coste_usd()\ncalcular_metricas_texto()\ncalcular_similitud_jaccard_media()" as MET
+
+  component "sanitizar_error.py\nnormaliza excepciones\nde los 4 proveedores" as SAN
+
+  package "Clientes LLM" as PKG_CLI {
+    component "BaseLLMClient\n(clase abstracta)\ncompletar() · generar_imagen() · editar_imagen()" as BCL
+    component "ClaudeClient"  as CL
+    component "OpenAIClient"  as OA
+    component "GeminiClient"  as GE
+    component "GrokClient"    as GR
+  }
+}
+
+component "TarifaService\n(desde Parte 1/3)" as TS
+
+cloud "Anthropic API"     as CAPI
+cloud "OpenAI API"        as OAPI
+cloud "Google Gemini API" as GAPI
+cloud "xAI Grok API"      as XAPI
+
+BS  --> RUN
+RUN --> MET
+RUN --> BCL
+RUN ..> SAN : envuelve excepciones
+
+BCL <|-- CL
+BCL <|-- OA
+BCL <|-- GE
+BCL <|-- GR
+
+TS  --> MET : refrescar_cache_precios()
+
+CL --> CAPI : HTTPS + API key
+OA --> OAPI : HTTPS + API key
+GE --> GAPI : HTTPS + API key
+GR --> XAPI : HTTPS + API key
+
+note right of RUN
+  Detalle del flujo paralelo en
+  act_motor_llm_paralelo.
+  Cada cliente devuelve
+  ResultadoLLM con tokens,
+  latencia, coste y texto.
+end note
+
+note right of BCL
+  Claude: solo texto.
+  OpenAI, Gemini, Grok:
+  texto + imagen (txt2img
+  y img2img segun categoria).
+end note
+
+@enduml

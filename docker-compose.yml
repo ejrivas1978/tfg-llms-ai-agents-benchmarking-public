@@ -1,0 +1,79 @@
+# ============================================================
+# docker-compose.yml
+# Path: docker-compose.yml (raiz del proyecto)
+#
+# Descripcion:
+#   Entorno de desarrollo local con PostgreSQL 15 y pgAdmin 4.
+#   Lee las variables de entorno desde backend/.env.
+#   Uso habitual:
+#     docker-compose up -d postgres        solo base de datos
+#     docker-compose up -d                 postgres + pgadmin
+#     docker-compose down                  parar
+#     docker-compose down -v               parar y borrar datos
+#
+# Sprint: Sprint 1
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL 15 — base de datos principal
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: tfg_llm_postgres
+    restart: unless-stopped
+    env_file:
+      - backend/.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tfg_llm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tfg_llm_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tfg_network
+
+  # ----------------------------------------------------------
+  # pgAdmin 4 — interfaz web para gestionar PostgreSQL
+  # Acceso: http://localhost:5050
+  # Login: PGADMIN_EMAIL / PGADMIN_PASSWORD (del .env)
+  # ----------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tfg_llm_pgadmin
+    restart: unless-stopped
+    env_file:
+      - backend/.env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@tfg.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tfg_network
+
+volumes:
+  postgres_data:
+    name: tfg_llm_postgres_data
+  pgadmin_data:
+    name: tfg_llm_pgadmin_data
+
+networks:
+  tfg_network:
+    name: tfg_llm_network
+    driver: bridge

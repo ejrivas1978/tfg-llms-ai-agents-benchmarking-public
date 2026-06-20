@@ -1,0 +1,126 @@
+@startuml sec_solicitud_borrado_p2
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ============================================================
+' Secuencia: Solicitud de borrado de evaluacion — Parte 2/2
+' Ruta: docs/diagramas/plantuml/sec_solicitud_borrado_p2.puml
+' Cubre: RF-20 (admin elimina) y RF-33 (admin rechaza).
+' Viene de sec_solicitud_borrado_p1.
+' ============================================================
+
+title Solicitud de borrado — Parte 2/2: Admin aprueba o rechaza (RF-20 / RF-33)
+
+participant "TablaAdmin\n(panel admin)" as AdminUI
+participant "DELETE /admin\n/evaluaciones/{id}" as RouterD
+participant "POST /admin\n/evaluaciones/{id}\n/rechazar-borrado" as RouterR
+participant "BenchmarkEvaluacion\nRepository" as Repo
+database "PostgreSQL" as DB
+actor "Admin" as Admin
+
+note over AdminUI, Admin
+  ════════════════════════════════════════
+   Viene de sec_solicitud_borrado_p1
+   (usuario ya solicito el borrado)
+  ════════════════════════════════════════
+end note
+
+note over AdminUI
+  El panel admin muestra un badge
+  con el numero de solicitudes
+  pendientes en la pestana
+  de evaluaciones (RF-33).
+end note
+
+== 2a · Admin aprueba: borrado definitivo (RF-20) ==
+
+Admin -> AdminUI : filtra por estado "solicitud_borrado"\ny selecciona la evaluacion
+Admin -> AdminUI : pulsa "Eliminar"
+AdminUI -> AdminUI : abre ConfirmModal
+Admin -> AdminUI : confirma eliminacion
+
+AdminUI -> RouterD : DELETE /admin/evaluaciones/{id}\nHeader: Bearer JWT
+RouterD -> RouterD : Depends(get_current_user) -> admin OK
+RouterD -> Repo : eliminar_evaluacion(id)
+Repo -> DB : DELETE FROM benchmark_evaluaciones\nWHERE id = {id}\n(CASCADE a llm_responses y user_evaluations)
+DB --> Repo : OK
+Repo --> RouterD : OK
+RouterD --> AdminUI : 204 No Content
+AdminUI -> AdminUI : invalida cache admin-comparativas\ny admin-solicitudes-borrado
+AdminUI --> Admin : fila desaparece · badge decrementado
+
+== 2b · Admin rechaza: restauracion a completada (RF-33) ==
+
+Admin -> AdminUI : pulsa "Rechazar solicitud"\nen la misma fila
+AdminUI -> AdminUI : abre ConfirmModal
+Admin -> AdminUI : confirma rechazo
+
+AdminUI -> RouterR : POST /admin/evaluaciones/{id}/rechazar-borrado\nHeader: Bearer JWT
+RouterR -> RouterR : Depends(get_current_user) -> admin OK
+RouterR -> Repo : rechazar_solicitud_borrado(id)
+Repo -> DB : SELECT status FROM benchmark_evaluaciones\nWHERE id = {id}
+
+alt estado != solicitud_borrado
+  DB --> Repo : status incorrecto
+  Repo --> RouterR : "estado_invalido"
+  RouterR --> AdminUI : 409 Conflict
+  AdminUI --> Admin : toast error "La evaluacion no tiene solicitud activa"
+else estado correcto
+  Repo -> DB : UPDATE status = 'completada'\nWHERE id = {id}
+  DB --> Repo : OK
+  Repo --> RouterR : evaluacion restaurada
+  RouterR --> AdminUI : 200 OK
+  AdminUI -> AdminUI : invalida cache admin-comparativas\ny admin-solicitudes-borrado
+  AdminUI --> Admin : badge decrementado\n(evaluacion vuelve a estado completada)
+end
+
+note over AdminUI, Admin
+  El usuario ve la fila en estado "completada"
+  en su historial al volver a cargar.
+  No recibe notificacion activa (no hay email, ADR-031).
+end note
+
+@enduml

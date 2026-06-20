@@ -1,0 +1,146 @@
+@startuml arq_extension_nuevo_llm_frontend
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam classBackgroundColor #D5E8D4
+skinparam classBorderColor #000000
+skinparam classFontColor #000000
+skinparam packageBackgroundColor #F2F2F2
+skinparam packageBorderColor #000000
+
+' ============================================================
+' Patron de extension para nuevos proveedores LLM — frontend
+' Ruta: docs/diagramas/plantuml/arq_extension_nuevo_llm_frontend.puml
+' Muestra los 3 pasos para anadir un proveedor sin tocar
+' ningun componente existente.
+' ============================================================
+
+title Como anadir un nuevo proveedor LLM en el frontend\n(3 pasos, 0 componentes modificados)
+
+' ── PASO 1 ───────────────────────────────────────────────────
+package "PASO 1 — Tipo union (1 linea en benchmark.ts)" as PKG_TIPO #DDEEFF {
+  note as N_TIPO
+    types/benchmark.ts
+    ──────────────────────────────────
+    export type LLMProvider =
+        | 'claude' | 'openai'
+        | 'gemini' | 'grok'
+        | 'mistral'    <-- unica linea nueva
+  end note
+}
+
+' ── PASO 2 ───────────────────────────────────────────────────
+package "PASO 2 — Icono SVG (2 lineas en llmIcons.ts)" as PKG_ICON #DDEEFF {
+  note as N_ICON
+    utils/llmIcons.ts
+    ──────────────────────────────────
+    import mistral from './mistral.svg'
+    LLM_ICONS = { claude, openai,
+                  gemini, grok, mistral }
+  end note
+}
+
+' ── PASO 3 ───────────────────────────────────────────────────
+package "PASO 3 — Entrada en el registro (llmProviders.ts)" as PKG_CONF #DDEEFF {
+
+  interface ProveedorConfig {
+    id : LLMProvider
+    nombre : string
+    nombreCorto : string
+    color : string
+    bg : string
+    icono : string
+    puedeGenerarImagenes : boolean
+    puedeEditarImagenes : boolean
+    puedeVision : boolean
+  }
+
+  class LLM_PROVIDERS_CONFIG <<registro>> {
+    claude  : ProveedorConfig
+    openai  : ProveedorConfig
+    gemini  : ProveedorConfig
+    grok    : ProveedorConfig
+    ──────────────────────────────
+    mistral : ProveedorConfig   <-- entrada nueva
+  }
+
+  LLM_PROVIDERS_CONFIG .right.> ProveedorConfig : cada entrada\nimplementa
+}
+
+' ── Derivados automaticos ────────────────────────────────────
+package "Derivados automaticos (sin cambios)" as PKG_AUTO #F2F2F2 {
+  note as N_AUTO
+    PROVEEDORES_LIST     = [..., 'mistral']
+    PROVEEDORES_SIN_IMAGEN = filter(puedeGenerarImagenes)
+    proveedorColor(id)
+    proveedorIcono(id)
+    proveedorNombre(id)
+  end note
+}
+
+' ── Componentes consumidores ─────────────────────────────────
+package "Componentes — sin ninguna modificacion" as PKG_COMP #F2F2F2 {
+  class BenchmarkPage <<page>> {
+    Lee PROVEEDORES_LIST para chips
+    Lee PROVEEDORES_ORDER para grid
+  }
+  class DashboardPage <<page>> {
+    Lee LLM_PROVIDERS_CONFIG
+    para colores y nombres en charts
+  }
+  class SubcatPanel <<component>> {
+    Usa PROVEEDORES_SIN_IMAGEN
+    para inactivar segun categoria
+  }
+  class BenchmarkCard <<component>> {
+    Lee ProveedorConfig por id
+  }
+  class EvalCard <<component>> {
+    Lee ProveedorConfig por id
+  }
+  class TablaAdmin <<component>> {
+    Lee ProveedorConfig para
+    chips de filtro
+  }
+}
+
+' ── Relaciones ───────────────────────────────────────────────
+PKG_TIPO ..> LLM_PROVIDERS_CONFIG : informa el tipo\n(PASO 1)
+PKG_ICON ..> LLM_PROVIDERS_CONFIG : aporta el icono\n(PASO 2)
+LLM_PROVIDERS_CONFIG --> PKG_AUTO   : genera listas\ny helpers
+PKG_AUTO              --> PKG_COMP  : alimenta todos\nlos componentes
+
+note bottom of PKG_COMP
+  PASO 4: ninguno.
+  Cada componente itera sobre
+  PROVEEDORES_LIST o accede por id.
+  Mistral aparece automaticamente
+  en chips, grid, graficos y filtros.
+  Open/Closed Principle aplicado.
+end note
+
+note right of ProveedorConfig
+  Los flags booleanos
+  (puedeGenerarImagenes, puedeVision...)
+  controlan la logica de negocio
+  del frontend sin condicionales
+  hardcodeados por proveedor.
+end note
+
+@enduml

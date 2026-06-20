@@ -1,0 +1,82 @@
+@startuml arq_componentes_frontend_p1a
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Arquitectura Frontend — Parte 1a/3: Paginas y Estado Zustand
+' Ruta: docs/diagramas/plantuml/arq_componentes_frontend_p1a.puml
+' Cubre: las 6 paginas React y los 4 stores Zustand.
+' Configuracion SOLID y panel admin: ver Parte 1b/3.
+' Capa de servicios HTTP:            ver Parte 2/3.
+' ============================================================
+
+title Frontend 1a/3 — Paginas React y Estado Global (Zustand)
+
+package "Paginas (React 18 + TypeScript)" as PKG_PAGES {
+  component "NickPage\n(login / registro)" as NPage
+  component "BenchmarkPage\n(formulario + resultados)" as BPage
+  component "HistorialPage\n(historial propio\n+ panel admin)" as HPage
+  component "DashboardPage\n(15 graficas globales)" as DPage
+  component "EvaluationPage\n(modal valoracion)" as EPage
+  component "Layout + Topbar\n(navegacion global)" as Layout
+}
+
+package "Estado cliente — Zustand" as PKG_STORE {
+  component "nickStore\n(nick activo)" as NS
+  component "usuarioStore\n(JWT usuario, cuota)" as US
+  component "adminStore\n(JWT admin, es_root)" as AS
+  component "historialStore\n(localStorage)" as HS
+}
+
+' Paginas -> stores
+NPage  --> NS : setNick / clear
+NPage  --> US : setToken
+NPage  --> AS : setSession
+BPage  --> US : lee cuota / nick
+BPage  --> HS : guarda evaluacion
+HPage  --> HS : lee historial local
+Layout --> US : actualizarCuota()\n(ADR-033)
+
+note right of US
+  Persistido en localStorage.
+  Layout llama GET /api/v1/usuarios/me
+  al montar para sincronizar cuota
+  con la BD (ADR-033).
+end note
+
+note bottom of PKG_STORE
+  Persistencia: historialStore, usuarioStore
+  y nickStore en localStorage.
+  adminStore en sessionStorage.
+  Configuracion SOLID: ver Parte 1b/3.
+  Llamadas HTTP: ver Parte 2/3.
+end note
+
+@enduml

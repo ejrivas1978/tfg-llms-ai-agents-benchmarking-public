@@ -1,0 +1,107 @@
+@startuml arq_componentes_frontend_p2
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Arquitectura Frontend — Parte 2/2: Capa HTTP
+' Ruta: docs/diagramas/plantuml/arq_componentes_frontend_p2.puml
+' Cubre: servicios api*.ts, interceptores axios y salida HTTPS
+'        hacia el backend REST /api/v1.
+' ============================================================
+
+title Frontend 2/2 — Capa HTTP: api*.ts, interceptores y salida HTTPS
+
+package "Paginas (origen de llamadas)" as PKG_PAGES {
+  component "NickPage"        as NPage
+  component "BenchmarkPage"   as BPage
+  component "HistorialPage\n+ panel admin" as HPage
+  component "DashboardPage"   as DPage
+  component "EvaluationPage"  as EPage
+}
+
+package "HTTP Client — axios" as PKG_AXIOS {
+  component "usuarioApi.ts\n/usuarios/*" as API_USR
+  component "benchmarkApi.ts\n/benchmarks/* · /stats" as API_BCH
+  component "evaluacionApi.ts\n/evaluacion/*" as API_EVL
+  component "adminApi.ts\n/admin/*" as API_ADM
+  component "authApi.ts\n/auth/*" as API_AUT
+
+  component "Request Interceptor\ninyecta Authorization: Bearer <JWT>" as IR
+  component "Response Interceptor\nmaneja 401 → limpia sesion y redirige" as IS
+}
+
+interface "HTTPS → REST /api/v1\n(Bearer JWT)" as REST_OUT
+
+' Paginas -> api*.ts
+NPage --> API_USR
+NPage --> API_AUT
+BPage --> API_BCH
+HPage --> API_BCH
+HPage --> API_ADM
+DPage --> API_BCH : GET /stats
+EPage --> API_EVL
+
+' Todos los clientes comparten interceptores
+API_USR ..> IR
+API_BCH ..> IR
+API_EVL ..> IR
+API_ADM ..> IR
+API_AUT ..> IR
+
+API_USR ..> IS
+API_BCH ..> IS
+API_EVL ..> IS
+API_ADM ..> IS
+API_AUT ..> IS
+
+' Salida hacia backend
+IR  --> REST_OUT : peticion con Bearer
+IS <-- REST_OUT  : respuesta (detecta 401)
+
+note right of REST_OUT
+  Frontera del sistema.
+  Routers / servicios / repos
+  del backend en
+  arq_componentes_backend_p1/p2/p3.
+end note
+
+note right of IS
+  En 401: limpia usuarioStore
+  o adminStore segun el tipo
+  de sesion activa y redirige
+  a NickPage.
+end note
+
+@enduml

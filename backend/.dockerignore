@@ -1,0 +1,50 @@
+# ===========================================================
+# .dockerignore — Backend
+# Ruta: backend/.dockerignore
+#
+# Excluye ficheros innecesarios del contexto de build de Docker.
+# Reduce el tamano del contexto y evita copiar secretos al contenedor.
+# ===========================================================
+
+# Entorno virtual local — las dependencias se instalan en el Dockerfile
+.venv-tfg-llm/
+.venv/
+venv/
+env/
+
+# Secretos — nunca deben entrar al contenedor
+.env
+.env.*
+!.env.example
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Tests — no necesarios en la imagen de produccion
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.log
+
+# Herramientas de calidad de codigo
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Documentacion
+*.md
+docs/

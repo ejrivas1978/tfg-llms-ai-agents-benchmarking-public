@@ -1,0 +1,95 @@
+@startuml sec_valorar_admin_guard_p2
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+
+' ============================================================
+' Secuencia: Valoracion desde panel admin — Parte 2/2
+' Defensa adicional en backend (RF-29)
+' Viene de sec_valorar_admin_guard_p1.
+' Aunque el frontend bloquea el acceso, si llegara una peticion
+' con nickname distinto al del benchmark, el backend devuelve 403.
+' ============================================================
+
+autonumber
+
+participant "evaluacionApi.ts" as API
+participant "POST /evaluaciones\n(FastAPI)" as Router
+participant "EvaluacionService" as Svc
+
+note over API, Svc
+  ════════════════════════════════════════
+   Viene de sec_valorar_admin_guard_p1
+  ════════════════════════════════════════
+end note
+
+== Defensa adicional en backend ==
+
+note over API, Svc
+  Si por algun camino (Postman, llamada manual) llega a
+  POST /api/v1/evaluaciones con un nickname distinto al
+  del benchmark, el servicio lo rechaza con 403.
+end note
+
+API -> Router : POST /api/v1/evaluaciones\nBody: { response_id,\nnickname='admin', rating, rango }
+activate Router
+Router -> Svc : crear(...)
+activate Svc
+Svc -> Svc : respuesta.benchmark.nickname = 'otro_user'\n!= peticion.nickname = 'admin'
+Svc --> Router : HTTPException 403\n"El nickname no coincide\ncon el de la evaluacion"
+deactivate Svc
+Router --> API : 403
+deactivate Router
+
+note right of Svc
+  Esto cierra la defensa en
+  profundidad: ni siquiera con
+  el JWT del admin se puede
+  violar la restriccion RF-29.
+end note
+
+@enduml

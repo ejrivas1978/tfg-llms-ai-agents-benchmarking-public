@@ -1,0 +1,219 @@
+@startuml sec_usuario_login_errores
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' Inyectado por docs/diagramas/plantuml/_normalizar_estilo_claro.py
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+' Notas: amarillo palido, texto negro, borde naranja oscuro.
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+' Titulos
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+' Divisores y headers
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+' ─── Secuencia ───────────────────────────
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ─── Actividad ───────────────────────────
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+skinparam activityArrowColor #000000
+
+' ─── Estados ─────────────────────────────
+skinparam state {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+' ─── Casos de uso ────────────────────────
+skinparam usecase {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Clases ──────────────────────────────
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  StereotypeFontColor #595959
+}
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFF2CC
+skinparam classBorderColor #000000
+
+' ─── Componentes / paquetes ──────────────
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam node {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── ER ──────────────────────────────────
+skinparam entity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Rectangulos genericos ──────────────
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Interfaces ──────────────────────────
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Secuencia: Login del usuario web - ramas de error (RF-03)
+' Ruta: docs/diagramas/plantuml/sec_usuario_login_errores.puml
+'
+' Tres escenarios de error del endpoint POST /usuarios/login, en
+' el orden de verificacion del backend:
+'   1. Contrasena incorrecta -> 401 + incrementa intentos_fallidos.
+'   2. intentos_fallidos >= 5 -> 423 Locked (cuenta bloqueada).
+'   3. estado == pendiente_acceso -> 403 acceso no aprobado.
+'
+' El camino feliz esta en sec_usuario_login_exito.
+' ============================================================
+
+actor "Usuario web" as U
+participant "NickPage\n(React)" as NP
+participant "usuarioApi\n(axios)" as API
+participant "POST /usuarios/login\n(FastAPI)" as LOGIN
+participant "UsuarioAppAuthService" as SVC
+participant "UsuarioAppRepository" as REPO
+participant "Security" as SEC
+database "PostgreSQL\nusuarios_app" as DB
+
+U   -> NP  : introduce contrasena
+NP  -> API : loginUsuario({ nick, password })
+API -> LOGIN : POST /api/v1/usuarios/login
+LOGIN -> SVC : login(nick, password)
+note right of SVC
+  PeticionLogin (Pydantic) aplica
+  field_validator: nick.strip().lower()
+  case-insensitive.
+end note
+SVC -> REPO : obtener_por_nick(nick)
+REPO -> DB : SELECT ... WHERE nick = ?
+DB --> REPO : usuario
+REPO --> SVC : usuario
+
+alt 1) Contrasena incorrecta
+  SVC -> SEC : verify_password(password, hash)
+  SEC --> SVC : False
+  SVC -> REPO : incrementar_intentos(usuario.id)
+  REPO -> DB : UPDATE intentos_fallidos += 1
+  SVC --> LOGIN : HTTPException 401\n"Credenciales invalidas"
+  LOGIN --> API : 401
+  API --> NP : error
+  NP --> U : "Nick o contrasena incorrectos"
+
+else 2) Cuenta bloqueada (intentos_fallidos >= 5)
+  SVC -> SVC : usuario.intentos_fallidos >= 5
+  SVC --> LOGIN : HTTPException 423\n"Cuenta bloqueada por multiples intentos"
+  LOGIN --> API : 423 Locked
+  API --> NP : error
+  NP --> U : "Demasiados intentos.\nContacta con el administrador."
+
+else 3) Estado pendiente_acceso
+  SVC -> SVC : usuario.estado == 'pendiente_acceso'
+  SVC --> LOGIN : HTTPException 403\n"Acceso no aprobado"
+  LOGIN --> API : 403
+  API --> NP : error
+  NP --> U : "Tu cuenta esta pendiente\nde aprobacion."
+end
+
+note over U,NP
+  En los tres casos el usuario
+  permanece en NickPage y puede
+  reintentar (sujeto a rate-limit).
+end note
+
+@enduml

@@ -1,0 +1,119 @@
+@startgantt
+<style>
+ganttDiagram {
+  task {
+    BackGroundColor #D6E4F0
+    LineColor #2980B9
+    FontColor #1A1A1A
+    FontSize 11
+    FontName Arial
+  }
+  separator {
+    BackGroundColor #1B4F72
+    LineColor #1B4F72
+    FontColor #FFFFFF
+    FontSize 11
+    FontStyle bold
+    FontName Arial
+  }
+  milestone {
+    BackGroundColor #F4D03F
+    LineColor #D4AC0D
+    FontColor #1A1A1A
+    FontSize 11
+    FontName Arial
+  }
+  timeline {
+    BackGroundColor #EBF5FB
+    FontColor #1B4F72
+    FontSize 10
+    FontName Arial
+    FontStyle bold
+  }
+  title {
+    FontColor #1B4F72
+    FontSize 14
+    FontStyle bold
+    FontName Arial
+  }
+}
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+</style>
+
+language es
+title Planificacion temporal — TFG Benchmarking LLMs (ene–jun 2026)
+printscale weekly
+
+Project starts 2026-01-01
+
+-- Sprint 1: Infraestructura (enero 2026 · 60 h) --
+[Setup entorno: VS Code, Python, Node, PostgreSQL] as [S1T1] lasts 7 days and is colored in #AED6F1/2980B9
+[Estructura GitHub y configuracion inicial] as [S1T2] lasts 5 days and is colored in #AED6F1/2980B9
+[S1T2] starts at [S1T1]'s end
+[Diseno modelo de datos (6 entidades ORM)] as [S1T3] lasts 7 days and is colored in #AED6F1/2980B9
+[S1T3] starts at [S1T2]'s end
+[Migraciones Alembic + health endpoint] as [S1T4] lasts 7 days and is colored in #AED6F1/2980B9
+[S1T4] starts at [S1T3]'s end
+[Cierre Sprint 1] as [M1] happens at [S1T4]'s end
+[M1] is colored in #F4D03F/D4AC0D
+
+-- Sprint 2: Motor LLMs y API core (febrero 2026 · 75 h) --
+[Autenticacion JWT + endpoints admin] as [S2T1] lasts 5 days and is colored in #A9DFBF/27AE60
+[S2T1] starts 2026-02-02
+[Clientes LLM x4 + BaseLLMClient] as [S2T2] lasts 10 days and is colored in #A9DFBF/27AE60
+[S2T2] starts at [S2T1]'s end
+[Motor asyncio.gather + modulo metricas] as [S2T3] lasts 5 days and is colored in #A9DFBF/27AE60
+[S2T3] starts at [S2T2]'s end
+[Endpoints /benchmarks/run + /stats] as [S2T4] lasts 5 days and is colored in #A9DFBF/27AE60
+[S2T4] starts at [S2T3]'s end
+[Tests unitarios: LLMRunner y metricas] as [S2T5] lasts 3 days and is colored in #A9DFBF/27AE60
+[S2T5] starts at [S2T4]'s end
+[Cierre Sprint 2] as [M2] happens at [S2T5]'s end
+[M2] is colored in #F4D03F/D4AC0D
+
+-- Sprint 3: Frontend completo (mar-abr 2026 · 90 h) --
+[BenchmarkPage: categorias, prompt y tarjetas LLM] as [S3T1] lasts 12 days and is colored in #FAD7A0/E67E22
+[S3T1] starts 2026-03-02
+[EvaluationPage: estrellas y ranking DnD] as [S3T2] lasts 10 days and is colored in #FAD7A0/E67E22
+[S3T2] starts at [S3T1]'s end
+[DashboardPage: 13 graficas Recharts] as [S3T3] lasts 14 days and is colored in #FAD7A0/E67E22
+[S3T3] starts at [S3T2]'s end
+[HistorialPage + TablaAdmin con filtros] as [S3T4] lasts 10 days and is colored in #FAD7A0/E67E22
+[S3T4] starts at [S3T3]'s end
+[BatLoader, iconos SVG y correcciones UX] as [S3T5] lasts 8 days and is colored in #FAD7A0/E67E22
+[S3T5] starts at [S3T4]'s end
+[Cierre Sprint 3] as [M3] happens at [S3T5]'s end
+[M3] is colored in #F4D03F/D4AC0D
+
+-- Sprint 4: Produccion y documentacion (01/05-14/05/2026 · 75 h) --
+[Integracion E2E frontend-backend] as [S4T1] lasts 4 days and is colored in #D7BDE2/8E44AD
+[S4T1] starts 2026-05-01
+[Suite de tests: 389 pruebas, cobertura 96%] as [S4T2] lasts 5 days and is colored in #D7BDE2/8E44AD
+[S4T2] starts at [S4T1]'s end
+[Despliegue Cloud Run + Cloud SQL + CI/CD] as [S4T3] lasts 3 days and is colored in #D7BDE2/8E44AD
+[S4T3] starts at [S4T2]'s end
+[Auditoria sesgos y correcciones finales] as [S4T4] lasts 2 days and is colored in #D7BDE2/8E44AD
+[S4T4] starts at [S4T3]'s end
+[Memoria TFG: capitulos 1-6 y diagramas] as [S4T5] lasts 14 days and is colored in #D7BDE2/8E44AD
+[S4T5] starts 2026-05-01
+[Cierre Sprint 4] as [M4] happens 2026-05-14
+[M4] is colored in #F4D03F/D4AC0D
+
+-- Sprint 5: Evaluacion humana y analisis (14/05-15/06/2026 · 50 h) --
+[Protocolo evaluacion + reclutamiento evaluadores] as [S5T1] lasts 5 days and is colored in #A9CCE3/21618C
+[S5T1] starts 2026-05-14
+[Sesiones piloto y evaluaciones por categoria] as [S5T2] lasts 12 days and is colored in #A9CCE3/21618C
+[S5T2] starts at [S5T1]'s end
+[Sub-experimento ES vs EN: corpus controlado] as [S5T3] lasts 6 days and is colored in #A9CCE3/21618C
+[S5T3] starts at [S5T1]'s end
+[Analisis estadistico de resultados] as [S5T4] lasts 6 days and is colored in #A9CCE3/21618C
+[S5T4] starts at [S5T2]'s end
+[Redaccion cap. analisis de resultados] as [S5T5] lasts 7 days and is colored in #A9CCE3/21618C
+[S5T5] starts at [S5T4]'s end
+[Revision integral memoria + entrega final] as [S5T6] lasts 4 days and is colored in #A9CCE3/21618C
+[S5T6] starts at [S5T5]'s end
+[Cierre Sprint 5] as [M5] happens 2026-06-15
+[M5] is colored in #F4D03F/D4AC0D
+
+@endgantt

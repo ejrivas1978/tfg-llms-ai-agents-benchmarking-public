@@ -1,0 +1,162 @@
+@startuml arq_extension_nuevo_llm
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam classBackgroundColor #D5E8D4
+skinparam classBorderColor #000000
+skinparam classFontColor #000000
+skinparam packageBackgroundColor #F2F2F2
+skinparam packageBorderColor #000000
+
+' ============================================================
+' Patron de extension para nuevos proveedores LLM
+' Ruta: docs/diagramas/plantuml/arq_extension_nuevo_llm.puml
+' Muestra los 4 pasos para anadir un proveedor sin tocar el runner
+' ni los servicios existentes.
+' ============================================================
+
+title Como anadir un nuevo proveedor LLM sin modificar el runner ni los servicios
+
+package "Contrato — llm_engine/clients/" as PKG_BASE {
+
+  abstract class BaseLLMClient {
+    + SOPORTA_IMAGEN : bool = False
+    + SOPORTA_VISION : bool = True
+    + SOPORTA_EDICION_IMAGEN : bool = False
+    --
+    + {abstract} completar(prompt, max_tokens, imagen_base64) : ResultadoLLM
+    + generar_imagen(prompt) : ResultadoLLM
+    + editar_imagen(prompt, imagen_base64, mime) : ResultadoLLM
+    # _marca_inicio() : float
+    # _latencia_ms(inicio) : int
+  }
+}
+
+package "Clientes existentes" as PKG_EXISTENTES {
+  class ClaudeClient {
+    SOPORTA_IMAGEN = False
+    SOPORTA_VISION = True
+    SOPORTA_EDICION_IMAGEN = False
+    --
+    + completar(...) : ResultadoLLM
+  }
+  class OpenAIClient {
+    SOPORTA_IMAGEN = True
+    SOPORTA_VISION = True
+    SOPORTA_EDICION_IMAGEN = True
+    --
+    + completar(...) : ResultadoLLM
+    + generar_imagen(...) : ResultadoLLM
+    + editar_imagen(...) : ResultadoLLM
+  }
+  class GeminiClient {
+    SOPORTA_IMAGEN = True
+    SOPORTA_VISION = True
+    SOPORTA_EDICION_IMAGEN = True
+    --
+    + completar(...) : ResultadoLLM
+    + generar_imagen(...) : ResultadoLLM
+  }
+  class GrokClient {
+    SOPORTA_IMAGEN = True
+    SOPORTA_VISION = True
+    SOPORTA_EDICION_IMAGEN = True
+    --
+    + completar(...) : ResultadoLLM
+    + generar_imagen(...) : ResultadoLLM
+  }
+}
+
+package "PASO 1 — Nuevo cliente (unico fichero a crear)" as PKG_NUEVO #DDEEFF {
+  class MistralClient <<nuevo>> {
+    SOPORTA_IMAGEN = False
+    SOPORTA_VISION = False
+    SOPORTA_EDICION_IMAGEN = False
+    --
+    + completar(...) : ResultadoLLM
+  }
+}
+
+package "Fabrica — runner.py" as PKG_RUNNER {
+  class construir_clientes <<factory>> {
+    + construir_clientes(anthropic_key, openai_key,\ngoogle_key, xai_key) : list[BaseLLMClient]
+  }
+  class ejecutar_benchmark <<orquestador>> {
+    + ejecutar_benchmark(clientes, prompt, ...) : list[ResultadoLLM]
+    --
+    Filtra por SOPORTA_IMAGEN / SOPORTA_VISION
+    asyncio.gather con return_exceptions=True
+  }
+}
+
+package "PASO 2 — Registro en fabrica (3 lineas)" as PKG_FAB_NUEVO #DDEEFF {
+  note as N_FAB
+    if mistral_key:
+        clientes.append(
+            MistralClient(mistral_key)
+        )
+  end note
+}
+
+package "PASO 3 — Variable de entorno (.env)" as PKG_ENV #DDEEFF {
+  note as N_ENV
+    MISTRAL_API_KEY=sk-...
+    (+ campo en pydantic Settings)
+  end note
+}
+
+package "Sin cambios" as PKG_SINC #F2F2F2 {
+  note as N_SINC
+    benchmark_service.py
+    benchmark_router.py
+    BenchmarkRepository
+    frontend / API REST
+    Tests existentes
+  end note
+}
+
+' Herencias
+BaseLLMClient <|-- ClaudeClient
+BaseLLMClient <|-- OpenAIClient
+BaseLLMClient <|-- GeminiClient
+BaseLLMClient <|-- GrokClient
+BaseLLMClient <|-- MistralClient
+
+' Flujo de uso
+construir_clientes --> ejecutar_benchmark : list[BaseLLMClient]
+ejecutar_benchmark ..> BaseLLMClient : llama a completar()\no generar_imagen()\nsegun flags
+
+' Pasos nuevos
+PKG_FAB_NUEVO ..> construir_clientes : PASO 2
+PKG_ENV        ..> construir_clientes : PASO 3
+
+note bottom of PKG_SINC
+  PASO 4: ninguno.
+  El runner itera sobre la lista
+  sin conocer el tipo concreto.
+  Open/Closed Principle aplicado.
+end note
+
+note right of MistralClient
+  PASO 1: crear
+  mistral_client.py
+  (unico fichero nuevo)
+end note
+
+@enduml

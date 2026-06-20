@@ -1,0 +1,121 @@
+@startuml arq_componentes_backend_p3
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam ArrowThickness 1.4
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam database {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Arquitectura Backend — Parte 3/3: Datos
+' Ruta: docs/diagramas/plantuml/arq_componentes_backend_p3.puml
+' Cubre: repositories, capa Core (DB, Config, Security)
+'        y tablas PostgreSQL.
+' ============================================================
+
+title Backend 3/3 — Capa de datos: Repositories, Core y PostgreSQL
+
+package "Servicios (desde Parte 1/3)" as PKG_SVC {
+  component "BenchmarkService"          as BS
+  component "EvaluacionService"         as ES
+  component "StatsService"              as SS
+  component "UsuarioAppAuthService"     as UAAS
+  component "UsuarioAppAdminService"    as UAS
+  component "TarifaService"             as TS
+  component "admin_export_service"      as EXP
+}
+
+package "Repositories (patron Repository)" as PKG_REPOS {
+  component "BenchmarkEvaluacionRepository" as BEVAL_R
+  component "LLMResponseRepository"         as LLMR_R
+  component "UserEvaluationRepository"      as UEVAL_R
+  component "UsuarioAppRepository"          as UAPP_R
+  component "TarifaRepository"              as TR
+}
+
+package "Core" as PKG_CORE {
+  component "Database\n(SQLAlchemy async + asyncpg)" as DB_CORE
+  component "Config\n(pydantic Settings / .env)"     as CFG
+  component "Security\n(bcrypt + JWT HS256)"         as SEC
+}
+
+database "PostgreSQL 15\n(Cloud SQL)" as PG {
+  [usuarios_app]           as TUAPP
+  [benchmark_evaluaciones] as TBE
+  [llm_responses]          as TLLMR
+  [user_evaluations]       as TUE
+  [tarifas_llm]            as TTAR
+}
+
+PKG_SVC   -[hidden]down-> PKG_REPOS
+PKG_REPOS -[hidden]down-> PKG_CORE
+
+' Servicios -> Repositories
+BS   --> BEVAL_R
+BS   --> LLMR_R
+ES   --> UEVAL_R
+SS   --> BEVAL_R
+SS   --> LLMR_R
+UAAS --> UAPP_R
+UAS  --> UAPP_R
+TS   --> TR
+EXP  --> BEVAL_R
+EXP  --> LLMR_R
+
+' Repositories -> Core
+BEVAL_R --> DB_CORE
+LLMR_R  --> DB_CORE
+UEVAL_R --> DB_CORE
+UAPP_R  --> DB_CORE
+TR      --> DB_CORE
+
+DB_CORE ..> CFG : DSN, pool size
+
+' Core -> PostgreSQL
+DB_CORE --> PG : asyncpg
+
+note right of PG
+  Esquema completo en
+  er_modelo_datos y
+  cls_modelos_orm.
+end note
+
+note right of TR
+  TarifaRepository persiste
+  versiones de tarifas_llm.
+  TarifaService crea nueva
+  fila vigente=TRUE y
+  refresca la cache en memoria
+  (ADR-028).
+end note
+
+@enduml

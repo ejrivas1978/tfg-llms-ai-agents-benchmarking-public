@@ -1,0 +1,100 @@
+@startuml met_metricas_dashboard_p3
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam database {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Diagrama: Metricas dashboard — Parte 3/3
+' Ruta: docs/diagramas/plantuml/met_metricas_dashboard_p3.puml
+' Cubre: metricas derivadas (texto, imagen, Jaccard),
+'         persistencia en llm_responses y agregados del dashboard.
+' ============================================================
+
+title Metricas automaticas 3/3 — Metricas derivadas, persistencia y dashboard
+
+rectangle "ResultadoLLM\n(campos raw — Parte 1/3)" as RES_IN {
+  component "texto_respuesta\nlatencia_ms\ntokens_entrada / salida\nurl_imagen" as RES_RAW
+}
+
+package "metricas.py — calculo derivado" as CALC {
+  component "calcular_metricas_texto()\n-> tokens_por_segundo (tps)\n-> ratio_salida_entrada\n-> palabras / parrafos\n-> diversidad_lexica (TTR)\n-> coste_por_100_palabras" as F_TXT
+  component "BaseLLMClient._latencia_ms()\nperf_counter() fin - inicio\n(incluida en ResultadoLLM)" as F_LAT
+  component "generar_miniatura()\nJPEG 512px base64 (Pillow)\nsolo si hay imagen generada" as F_MINI
+  component "calcular_similitud_jaccard_media()\nbigramas sobre pares de respuestas\nN*(N-1)/2 combinaciones\n(nivel de evaluacion)" as F_JAC
+}
+
+rectangle "ResultadoLLM\n(campos derivados)" as RES_OUT {
+  component "tokens_por_segundo\nratio_sal_ent\npalabras / parrafos\ndiversidad_lexica\ncoste_por_100_palabras\nimagen_miniatura" as RES_CALC
+}
+
+database "llm_responses\n(PostgreSQL)\ntarifa_id FK\nidioma_prompt es/en\ncost_usd NUMERIC(12,8)" as DB
+
+rectangle "GET /api/v1/stats\nDashboard — agregados" as DASH {
+  component "medias_por_proveedor (idioma=es)\nmedias_imagen\nsimilitud_jaccard_media\nmedias_comparativa_es_en\nevaluaciones_por_categoria" as DASH_C
+}
+
+RES_RAW --> F_TXT   : texto + tokens + latencia
+RES_RAW --> F_LAT   : timestamps
+RES_RAW --> F_MINI  : url_imagen (si existe)
+
+F_TXT  --> RES_CALC
+F_LAT  --> RES_CALC : latencia_ms
+F_MINI --> RES_CALC : imagen_miniatura
+
+RES_IN  --> DB : INSERT llm_responses
+RES_OUT --> DB : INSERT llm_responses
+
+DB --> F_JAC  : textos de la evaluacion
+F_JAC --> DASH_C : similitud_jaccard_media
+DB    --> DASH_C  : medias por proveedor
+
+note right of F_JAC
+  Calculo por evaluacion
+  completa (4 respuestas):
+  Jaccard sobre bigramas
+  (pares de palabras consecutivas).
+end note
+
+note bottom of DB
+  Sub-experimento bilingue (ADR-029):
+  En categorias con prompt predefinido,
+  BenchmarkService lanza dos rondas:
+    idioma_prompt='es'  -> evaluable por humano
+    idioma_prompt='en'  -> solo metricas
+  El dashboard filtra por 'es' para las
+  medias globales. La tarjeta "Comparativa
+  ES vs EN" usa medias_comparativa_es_en().
+end note
+
+@enduml

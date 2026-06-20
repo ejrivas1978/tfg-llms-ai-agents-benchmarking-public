@@ -1,0 +1,226 @@
+@startuml sec_degradar_admin
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' Inyectado por docs/diagramas/plantuml/_normalizar_estilo_claro.py
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+' Notas: amarillo palido, texto negro, borde naranja oscuro.
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+' Titulos
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+' Divisores y headers
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+' ─── Secuencia ───────────────────────────
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ─── Actividad ───────────────────────────
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+skinparam activityArrowColor #000000
+
+' ─── Estados ─────────────────────────────
+skinparam state {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+' ─── Casos de uso ────────────────────────
+skinparam usecase {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Clases ──────────────────────────────
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  StereotypeFontColor #595959
+}
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFF2CC
+skinparam classBorderColor #000000
+
+' ─── Componentes / paquetes ──────────────
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam node {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── ER ──────────────────────────────────
+skinparam entity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Rectangulos genericos ──────────────
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Interfaces ──────────────────────────
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Secuencia: Degradar admin / quitar privilegios (RF-31, solo root)
+' Ruta: docs/diagramas/plantuml/sec_degradar_admin.puml
+'
+' Endpoint POST /api/v1/admin/usuarios/{id}/quitar-admin.
+' Guards encadenados:
+'   - !caller.es_root -> 403
+'   - target.es_root -> 400 (no se puede degradar al root)
+'   - COUNT admins == 1 -> 400 (no dejar sistema sin admins)
+'   - OK -> UPDATE is_admin=False, email=NULL
+' El target conserva cuota_asignada y consultas_usadas para que
+' pueda volver a usar la aplicacion como usuario web sin perder
+' su historial.
+' ============================================================
+
+actor "Admin root\n(es_root=True)" as Root
+participant "TablaUsuarios.tsx" as UI
+participant "adminApi.ts" as API
+participant "POST /admin/usuarios/{id}\n/quitar-admin (FastAPI)" as R
+participant "UsuarioAppAdminService" as SVC
+participant "UsuarioAppRepository" as REPO
+database "PostgreSQL\nusuarios_app" as DB
+
+note over Root,UI
+  Boton "Quitar admin" visible solo si:
+    caller.es_root && target.is_admin
+    && !target.es_root
+end note
+
+Root -> UI : pulsa "Quitar admin"
+activate UI
+UI -> UI : abre ConfirmModal destructivo
+Root -> UI : confirma
+UI -> API : quitarAdminUsuario(token, id)
+activate API
+API -> R : POST /admin/usuarios/{id}/quitar-admin\nAuthorization: Bearer JWT
+activate R
+R -> SVC : degradar_admin(caller, id)
+activate SVC
+
+alt !caller.es_root
+  SVC --> R : HTTPException 403
+else target.es_root
+  SVC --> R : HTTPException 400\n"No se puede degradar al root"
+else solo queda un admin en el sistema
+  SVC -> REPO : contar_admins()
+  REPO -> DB : SELECT COUNT(*)\nFROM usuarios_app WHERE is_admin = TRUE
+  DB --> REPO : 1
+  REPO --> SVC : 1
+  SVC --> R : HTTPException 400\n"ultimo admin"
+else OK
+  SVC -> REPO : actualizar_admin(id, is_admin=False, email=NULL)
+  REPO -> DB : UPDATE usuarios_app\nSET is_admin = FALSE, email = NULL\nWHERE id = ?
+  DB --> REPO : ok
+  REPO --> SVC : usuario actualizado
+  SVC --> R : RespuestaUsuarioApp
+  R --> API : HTTP 200
+  API --> UI : usuario actualizado
+  UI --> Root : toast "@<nick> ya no es admin"
+end
+deactivate SVC
+deactivate R
+deactivate API
+deactivate UI
+
+note over DB
+  El target conserva:
+    cuota_asignada, consultas_usadas
+  Cuando vuelva a iniciar sesion
+  retomara los limites con esos valores.
+  Si quieres "borron y cuenta nueva" usa
+  RF-25 (Reset evaluaciones) por separado.
+end note
+
+@enduml

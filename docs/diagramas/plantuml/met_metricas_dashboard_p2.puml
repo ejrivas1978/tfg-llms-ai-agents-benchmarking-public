@@ -1,0 +1,101 @@
+@startuml met_metricas_dashboard_p2
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam database {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Diagrama: Metricas dashboard — Parte 2/3
+' Ruta: docs/diagramas/plantuml/met_metricas_dashboard_p2.puml
+' Cubre: cache de tarifas versionado y formula de coste (ADR-028).
+' ============================================================
+
+title Metricas automaticas 2/3 — Cache de tarifas y calculo de coste
+
+database "tarifas_llm\n(PostgreSQL)\nvigente = TRUE\nNUMERIC(12,8)" as DB_TAR
+
+package "metricas.py — cache en memoria" as CACHE_PKG {
+  component "refrescar_cache_precios(db)\n· al arrancar (lifespan)\n· tras cada PUT admin" as F_REFRESH
+  component "_PRECIOS_POR_MTOKEN[proveedor]\n  id, entrada, salida,\n  entrada_cacheado,\n  imagen_generar,\n  imagen_editar" as CACHE
+  component "obtener_id_tarifa_vigente(prov)\n-> tarifa_id (FK)" as F_ID
+}
+
+package "metricas.py — calculo" as CALC_PKG {
+  component "calcular_coste_usd(prov, in, out, cached)\n(in - cached) * precio_in\n+ cached * precio_cacheado\n+ out * precio_salida\n( / 1 000 000 )  round(8)" as F_COSTE
+  component "calcular_coste_imagen_usd(prov, editar)\nlee imagen_generar o imagen_editar\nsegun tipo de categoria" as F_COSTIMG
+}
+
+rectangle "ResultadoLLM\n(campos coste)" as RES {
+  component "coste_usd\ncoste_por_100_palabras\ntarifa_id (FK inmutable)" as RES_C
+}
+
+DB_TAR    --> F_REFRESH : SELECT vigente=TRUE
+F_REFRESH --> CACHE     : clear() + update() in-place
+CACHE     --> F_COSTE   : precio in / out / cached
+CACHE     --> F_COSTIMG : precio imagen
+CACHE     --> F_ID      : id tarifa vigente
+
+F_COSTE   --> RES_C : coste_usd (texto)
+F_COSTIMG --> RES_C : coste_usd (imagen)
+F_ID      --> RES_C : tarifa_id
+
+note right of DB_TAR
+  Tarifas auditadas (13/05/2026):
+  Texto USD/Mtok  in / out / cached:
+    claude   3.00 / 15.00 / 0.30
+    openai   2.50 / 10.00 / 1.25
+    gemini   0.30 /  2.50 / 0.03
+    grok     1.25 /  2.50 / 0.625
+  Imagen USD/img  generar / editar:
+    openai   0.07 / 0.07
+    gemini   0.04 / 0.039
+    grok     0.02 / 0.05
+end note
+
+note right of CACHE
+  Mutacion in-place tras PUT admin:
+  TarifaService.actualizar_tarifa()
+    1. crea nueva vigente (BD)
+    2. commit
+    3. refrescar_cache_precios()
+  Garantiza cache == BD en todo momento.
+end note
+
+note right of RES_C
+  tarifa_id enlaza cada respuesta
+  al precio con el que se cobro.
+  Cambiar la tarifa despues NO
+  recalcula respuestas pasadas.
+end note
+
+@enduml

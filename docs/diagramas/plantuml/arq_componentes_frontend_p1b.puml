@@ -1,0 +1,81 @@
+@startuml arq_componentes_frontend_p1b
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Arquitectura Frontend — Parte 1b/3: Configuracion SOLID y Panel Admin
+' Ruta: docs/diagramas/plantuml/arq_componentes_frontend_p1b.puml
+' Paginas y stores Zustand: ver Parte 1a/3.
+' Capa de servicios HTTP:   ver Parte 2/3.
+' ============================================================
+
+title Frontend 1b/3 — Configuracion SOLID (ADR-032) y Panel de Administracion
+
+' ── Capa de configuracion ────────────────────────────────────
+package "Configuracion — fuente unica de verdad (ADR-032)" as PKG_CONFIG #DDEEFF {
+  component "llmProviders.ts\n(metadatos + flags de capacidad\npor proveedor LLM)" as PROV
+  component "tokens.ts\n(tokens de diseno\npara uso programatico)" as TOK
+}
+
+note right of PKG_CONFIG
+  Consumidores:
+  · BenchmarkPage → LLM_PROVIDERS_CONFIG
+  · DashboardPage → colores + TOKENS.cat*
+  Open/Closed: anadir proveedor requiere
+  solo 3 ficheros (union type + SVG +
+  entrada en config). Sin tocar componentes.
+  tokens.ts replica hex de tailwind.config.ts
+  para canvas, Recharts y Mermaid.
+end note
+
+' ── Panel admin ──────────────────────────────────────────────
+package "Panel admin (dentro de HistorialPage)" as PKG_ADMIN {
+  component "TablaAdmin\n(comparativas)" as T_ADM
+  component "TablaUsuarios\n(usuarios web)" as T_USU
+  component "TablaTarifas\n(precios x proveedor)" as T_TAR
+  component "HistorialTarifaModal\n(versiones historicas)" as M_TAR
+}
+
+T_TAR --> M_TAR : abre modal historial
+
+note right of PKG_ADMIN
+  Renderizado por HistorialPage
+  como pestanas independientes.
+  ADR-028: 4 filas x 4 proveedores.
+  Inputs: entrada / salida /
+  cacheado / imagen.
+  Precision NUMERIC(12,8).
+  Costes relativos recalculados en vivo.
+end note
+
+' Fuerza disposicion vertical
+PKG_CONFIG -[hidden]down- PKG_ADMIN
+
+@enduml

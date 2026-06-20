@@ -1,0 +1,95 @@
+@startuml act_evaluacion_p3_ejecucion
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+
+' Diagrama: Flujo de evaluacion humana — Parte 3/4: Configuracion y ejecucion
+' Proyecto: TFG LLM Benchmarking — Emilio Javier Rivas
+
+|Usuario Web|
+start
+note right
+  ════════════════════════
+   Viene de Parte 2/4
+   Seleccion de categoria
+  ════════════════════════
+end note
+
+:Auto-scroll suave hacia PASO 2;
+
+partition "PASO 2 — SubcatPanel" {
+  if (categoria == 'libre'?) then (si)
+    :Salta SubcatPanel\n(el usuario escribe el prompt directamente);
+  else (no)
+    :Muestra SubcatPanel\n(subcategoria predefinida o\ntexto + idioma en traduccion);
+    :Usuario elige subcategoria\no introduce texto e idioma;
+  endif
+  :Auto-scroll suave hacia PASO 3;
+}
+
+partition "PASO 3 — Prompt + ejecucion" {
+  note right
+    Aparece solo cuando:
+     - categoria === 'libre', o
+     - hay prompt construido
+       (subcategoria elegida o
+        texto+idioma en traduccion)
+  end note
+  :Muestra prompt construido\n+ botones de opciones\n+ listado de modelos activos;
+  :Pulsa "Ejecutar comparativa";
+}
+
+|Backend|
+:POST /benchmarks/run\n(prompt + prompt_en opcional, ADR-029);
+
+if (Categoria bilingue ES/EN\ny prompt_en presente?) then (si)
+  :asyncio.gather — 4 LLMs en paralelo\nidioma_prompt = 'es';
+  :asyncio.gather — 4 LLMs en paralelo\nidioma_prompt = 'en'\n(segunda ronda, sin contexto compartido);
+else (no)
+  :asyncio.gather — 4 LLMs en paralelo\nidioma_prompt = 'es' por defecto;
+endif
+
+:Calcula 10 metricas por respuesta\n(latencia, tok/s, coste, palabras...);
+:status = completada\nconsultas_usadas += 1\n(cuenta como 1 aunque sean 8 respuestas);
+
+|Usuario Web|
+:Ve 4 BenchmarkCard con respuestas ES\n+ AutoStats con metricas agregadas\n+ acordeon "Ver respuesta en ingles"\nsi es evaluacion bilingue (ADR-029);
+
+note right
+  ════════════════════════
+   Continua en Parte 4/4
+   Evaluacion y ranking
+  ════════════════════════
+end note
+
+stop
+
+@enduml

@@ -1,0 +1,84 @@
+@startuml act_evaluacion_p1_autenticacion
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+
+' Diagrama: Flujo de evaluacion humana — Parte 1/4: Autenticacion
+' Proyecto: TFG LLM Benchmarking — Emilio Javier Rivas
+
+|Usuario Web|
+start
+
+:Introduce nick en NickPage;
+
+|Backend|
+:GET /usuarios/verificar/{nick}\nconsulta usuarios_app;
+
+|Usuario Web|
+if (Nick existe?) then (si)
+  :Introduce contrasena;
+  |Backend|
+  :POST /usuarios/login\nverifica bcrypt + emite JWT 1h;
+  |Usuario Web|
+  if (Login correcto?) then (si)
+    if (Estado habilitado?) then (si)
+      :JWT guardado en usuarioStore\n(tipo=usuario_app, id,\n es_admin, es_root);
+    else (no)
+      :Mensaje "pendiente de aprobacion";
+      stop
+    end if
+  else (no)
+    :Error de credenciales;
+    stop
+  end if
+else (no)
+  :Registro — estado pendiente_acceso;
+  stop
+end if
+
+if (guia_vista = false?) then (si)
+  :Muestra OnboardingGuide 7 pasos;
+  |Backend|
+  :PATCH /usuarios/marcar-guia-vista;
+  |Usuario Web|
+end if
+
+:Muestra listado fijo de modelos\nparticipantes sobre el PASO 1;
+note right
+  ════════════════════════
+   Continua en Parte 2/4
+   Seleccion de categoria
+  ════════════════════════
+end note
+
+stop
+
+@enduml

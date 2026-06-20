@@ -1,0 +1,228 @@
+@startuml sec_promover_admin
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' Inyectado por docs/diagramas/plantuml/_normalizar_estilo_claro.py
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+' Notas: amarillo palido, texto negro, borde naranja oscuro.
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+' Titulos
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+' Divisores y headers
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+' ─── Secuencia ───────────────────────────
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ─── Actividad ───────────────────────────
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+skinparam activityArrowColor #000000
+
+' ─── Estados ─────────────────────────────
+skinparam state {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+' ─── Casos de uso ────────────────────────
+skinparam usecase {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Clases ──────────────────────────────
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  StereotypeFontColor #595959
+}
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFF2CC
+skinparam classBorderColor #000000
+
+' ─── Componentes / paquetes ──────────────
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam node {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── ER ──────────────────────────────────
+skinparam entity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Rectangulos genericos ──────────────
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Interfaces ──────────────────────────
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Secuencia: Promover usuario a admin (RF-30, solo root)
+' Ruta: docs/diagramas/plantuml/sec_promover_admin.puml
+'
+' Endpoint POST /api/v1/admin/usuarios/{id}/promover-admin.
+' Solo el admin con es_root=True puede ejecutarlo. Se exige un
+' email no nulo (sirve como identificador alterno del admin nuevo).
+' Cadena de guards en el servicio:
+'   - !caller.es_root -> 403
+'   - target.is_admin -> 400 "ya es administrador"
+'   - email duplicado -> 409
+'   - OK -> UPDATE is_admin=True, email=...
+' ============================================================
+
+actor "Admin root\n(es_root=True)" as Root
+participant "TablaUsuarios.tsx" as UI
+participant "adminApi.ts" as API
+participant "POST /admin/usuarios/{id}\n/promover-admin (FastAPI)" as R
+participant "UsuarioAppAdminService" as SVC
+participant "UsuarioAppRepository" as REPO
+database "PostgreSQL\nusuarios_app" as DB
+
+note over Root,UI
+  Boton "Promover" visible solo si:
+    caller.es_root && !target.is_admin
+    && target.estado == 'habilitado'
+end note
+
+Root -> UI : pulsa "Promover"
+activate UI
+UI -> UI : abre PromoteModal(nick)
+Root -> UI : escribe email + confirmar
+UI -> UI : valida regex email en cliente
+UI -> API : promoverAdminUsuario(token, id, email)
+activate API
+API -> R : POST /admin/usuarios/{id}/promover-admin\nBody: { email }\nAuthorization: Bearer JWT
+activate R
+R -> R : Depends(get_current_user)\n  -> caller (admin actual)
+R -> SVC : promover_admin(caller, id, email)
+activate SVC
+
+alt !caller.es_root
+  SVC --> R : HTTPException 403\n"Solo el admin root puede promover"
+  R --> API : 403
+  API --> UI : error
+  UI --> Root : toast rojo
+else caller.es_root == True
+  SVC -> REPO : obtener_por_id(id)
+  REPO -> DB : SELECT FROM usuarios_app WHERE id = ?
+  DB --> REPO : target
+  REPO --> SVC : target
+
+  alt target.is_admin == True
+    SVC --> R : HTTPException 400\n"ya es administrador"
+  else email duplicado
+    SVC -> REPO : existe_email(email, exclude_id=id)
+    REPO -> DB : SELECT FROM usuarios_app\nWHERE email = ? AND id <> ?
+    DB --> REPO : count > 0
+    SVC --> R : HTTPException 409\n"email ya asociado"
+  else OK
+    SVC -> REPO : actualizar_admin(id, email=email, is_admin=True)
+    REPO -> DB : UPDATE usuarios_app\nSET email = ?, is_admin = TRUE\nWHERE id = ?
+    DB --> REPO : ok
+    REPO --> SVC : usuario actualizado
+    SVC --> R : RespuestaUsuarioApp
+    R --> API : HTTP 200
+    API --> UI : usuario actualizado
+    UI -> UI : invalida query 'admin-usuarios'
+    UI --> Root : toast verde "@<nick> ahora es admin"
+  end
+end
+deactivate SVC
+deactivate R
+deactivate API
+deactivate UI
+
+@enduml

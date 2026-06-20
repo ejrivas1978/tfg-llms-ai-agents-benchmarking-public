@@ -1,0 +1,216 @@
+@startuml sec_benchmark_ejecucion_paralela
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' Inyectado por docs/diagramas/plantuml/_normalizar_estilo_claro.py
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+
+' Notas: amarillo palido, texto negro, borde naranja oscuro.
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+
+' Titulos
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+' Divisores y headers
+skinparam dividerBackgroundColor #F2F2F2
+skinparam dividerFontColor #000000
+
+' ─── Secuencia ───────────────────────────
+skinparam sequence {
+  ActorBackgroundColor #DAE8FC
+  ActorBorderColor #000000
+  ActorFontColor #000000
+  ParticipantBackgroundColor #FFF2CC
+  ParticipantBorderColor #000000
+  ParticipantFontColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ArrowColor #000000
+  ArrowFontColor #000000
+  GroupBackgroundColor #F2F2F2
+  GroupHeaderFontColor #000000
+  GroupBorderColor #000000
+  ReferenceBackgroundColor #FFF9CC
+  ReferenceBorderColor #B5852E
+  ReferenceFontColor #000000
+  DividerBackgroundColor #F2F2F2
+  DividerFontColor #000000
+}
+skinparam activationBackgroundColor #FFF2CC
+skinparam activationBorderColor #000000
+skinparam databaseBackgroundColor #E1D5E7
+skinparam databaseBorderColor #000000
+skinparam databaseFontColor #000000
+
+' ─── Actividad ───────────────────────────
+skinparam activity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  StartColor #000000
+  EndColor #000000
+  DiamondBackgroundColor #DAE8FC
+  DiamondBorderColor #000000
+  DiamondFontColor #000000
+}
+skinparam activityArrowColor #000000
+
+' ─── Estados ─────────────────────────────
+skinparam state {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+' ─── Casos de uso ────────────────────────
+skinparam usecase {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #DAE8FC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Clases ──────────────────────────────
+skinparam class {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  StereotypeFontColor #595959
+}
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFF2CC
+skinparam classBorderColor #000000
+
+' ─── Componentes / paquetes ──────────────
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  ArrowColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam node {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #E1D5E7
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── ER ──────────────────────────────────
+skinparam entity {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Rectangulos genericos ──────────────
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ─── Interfaces ──────────────────────────
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Secuencia: Ejecucion paralela del benchmark - 4 LLMs (RF-07)
+' Ruta: docs/diagramas/plantuml/sec_benchmark_ejecucion_paralela.puml
+'
+' POST /api/v1/benchmarks/run dispara el motor paralelo:
+'   - BenchmarkService valida cuota/actor.
+'   - LLMRunner llama a los 4 clientes con asyncio.gather().
+'   - Cada cliente devuelve ResultadoLLM o excepcion capturada.
+'   - El tiempo total ~= max(T_i), no la suma.
+'   - Categoria imagen generativa: Claude no participa (solo 3 LLMs).
+'
+' La fase de calculo de metricas y persistencia esta en
+' sec_benchmark_persistencia.
+' ============================================================
+
+actor "Usuario web o admin\n(autenticado)" as U
+participant "BenchmarkPage\n(React)" as BP
+participant "benchmarkApi\n(axios)" as API
+participant "POST /benchmarks/run\n(FastAPI)" as R
+participant "BenchmarkService" as BS
+participant "runner.py\n(asyncio.gather)" as LR
+participant "Claude\nSonnet 4.6" as CL
+participant "GPT-4o" as OA
+participant "Gemini\n2.5 Flash" as GE
+participant "Grok 4.3" as GR
+
+U -> BP : selecciona categoria + prompt\n(o sube imagen / fichero)
+activate BP
+BP -> BP : valida cliente:\n  nick OK, sin pendiente,\n  cuota > 0 [RF-36]
+BP -> API : ejecutarBenchmark({\n  nickname, categoria, prompt,\n  imagen_base64?, subcat_imagen?\n})
+note right of API : requestInterceptor inyecta\nAuthorization: Bearer <JWT>
+activate API
+API -> R : POST /api/v1/benchmarks/run
+activate R
+R -> R : get_actor_benchmark(JWT)\n  -> UsuarioApp + cuota
+R -> BS : ejecutar(peticion, actor)
+activate BS
+BS -> LR : ejecutar_benchmark(prompt, subcat, imagen?)
+activate LR
+
+par asyncio.gather(return_exceptions=True)
+  LR ->> CL : messages.create(prompt)
+  CL -->> LR : ResultadoLLM (claude)
+also
+  LR ->> OA : chat.completions.create(prompt)
+  OA -->> LR : ResultadoLLM (openai)
+also
+  LR ->> GE : generate_content(prompt)
+  GE -->> LR : ResultadoLLM (gemini)
+also
+  LR ->> GR : chat.completions.create(prompt)
+  GR -->> LR : ResultadoLLM (grok)
+end
+
+LR --> BS : list[ResultadoLLM]\ntiempo total ~= max(T_i)
+deactivate LR
+
+note over BS,LR : continua en\nsec_benchmark_persistencia
+
+deactivate BS
+deactivate R
+deactivate API
+deactivate BP
+
+@enduml

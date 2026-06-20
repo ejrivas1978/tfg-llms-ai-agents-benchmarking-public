@@ -1,0 +1,110 @@
+@startuml arq_componentes_backend_p1
+
+' ============================================================
+' Estilo claro estandar — fondo blanco, fuente y lineas negras,
+' rellenos pastel suaves. NO MODO OSCURO.
+' ============================================================
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #000000
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #000000
+skinparam ArrowFontColor #000000
+skinparam ArrowThickness 1.4
+skinparam noteBackgroundColor #FFF9CC
+skinparam noteBorderColor #B5852E
+skinparam noteFontColor #000000
+skinparam titleFontColor #1F4E79
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+skinparam component {
+  BackgroundColor #D5E8D4
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F2F2F2
+  BorderColor #000000
+  FontColor #000000
+}
+skinparam interface {
+  BackgroundColor #FFF2CC
+  BorderColor #000000
+  FontColor #000000
+}
+
+' ============================================================
+' Arquitectura Backend — Parte 1/3: Capa HTTP
+' Ruta: docs/diagramas/plantuml/arq_componentes_backend_p1.puml
+' Cubre: routers FastAPI, servicios de negocio y autenticacion
+'        transversal (JWT + bcrypt).
+' ============================================================
+
+title Backend 1/3 — Capa HTTP: Routers y Servicios
+
+interface "HTTPS REST\n/api/v1\n(Bearer JWT)" as REST_IN
+
+package "Routers (capa HTTP)" as PKG_R {
+  component "auth_router\n/auth/login · /auth/refresh"              as AUTH_R
+  component "usuarios_router\n/usuarios/verificar-nick · /login · /registrar" as USU_R
+  component "benchmark_router\n/benchmarks/run · /{id}"             as BENCH_R
+  component "evaluacion_router\n/evaluacion/{id}"                    as EVAL_R
+  component "stats_router\n/stats"                                   as STATS_R
+  component "admin_router\nCRUD usuarios · tarifas · export"         as ADMIN_R
+  component "upload_router\n/upload/imagen"                          as UP_R
+}
+
+package "Servicios (logica de negocio)" as PKG_S {
+  component "AuthService"                    as AS_S
+  component "UsuarioAppAuthService"          as UAAS
+  component "BenchmarkService"               as BS
+  component "EvaluacionService"              as ES
+  component "StatsService"                   as SS
+  component "UsuarioAppAdminService"         as UAS
+  component "TarifaService"                  as TS
+  component "admin_export_service"           as EXP
+}
+
+package "Core — Auth transversal" as PKG_AUTH {
+  component "Dependencies\n(get_db, get_actor_benchmark)" as DEPS
+  component "Security\n(bcrypt + JWT HS256)"              as SEC
+}
+
+PKG_R -[hidden]down-> PKG_S
+PKG_S -[hidden]down-> PKG_AUTH
+
+REST_IN --> AUTH_R
+REST_IN --> USU_R
+REST_IN --> BENCH_R
+REST_IN --> EVAL_R
+REST_IN --> STATS_R
+REST_IN --> ADMIN_R
+REST_IN --> UP_R
+
+AUTH_R  --> AS_S
+USU_R   --> UAAS
+BENCH_R --> BS
+EVAL_R  --> ES
+STATS_R --> SS
+ADMIN_R --> UAS
+ADMIN_R --> EXP
+ADMIN_R --> TS
+
+PKG_R ..> DEPS : Depends()
+DEPS  ..> SEC  : valida JWT
+AS_S  ..> SEC
+UAAS  ..> SEC
+
+note right of REST_IN
+  Origen: frontend React.
+  Detalle en arq_componentes_frontend.
+end note
+
+note bottom of PKG_S
+  Parte 2/3: BenchmarkService -> Motor LLM
+  Parte 3/3: Servicios -> Repositories -> PostgreSQL
+end note
+
+@enduml
