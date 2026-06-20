@@ -144,6 +144,7 @@ Acceso:
 LOCAL:
 - Frontend: http://localhost:3000
 - API docs: http://localhost:8000/docs
+  
 ACCESO PUBLICO:
 https://tfg-frontend-u6m6pf6sqq-ew.a.run.app/
 
